@@ -25,7 +25,7 @@ Tumeloroot automates the entire process of unlocking the bootloader and rooting 
 ### From Source
 
 ```bash
-git clone https://github.com/Tumelo00/tumeloroot.git
+git clone https://github.com/-Tumelo00/tumeloroot.git
 cd tumeloroot
 pip install -e .
 ```
