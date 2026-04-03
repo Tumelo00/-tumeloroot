@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "tumeloroot"
+version = "1.0.0"
+description = "Plug-and-play MediaTek device bootloader unlock and root tool"
+readme = "README.md"
+license = {text = "GPL-3.0-or-later WITH name-protection"}
+requires-python = ">=3.9"
+authors = [{name = "Tumelo"}]
+keywords = ["mediatek", "root", "magisk", "bootloader", "unlock", "mtk"]
+
+dependencies = [
+    "PySide6>=6.5",
+    "PyYAML>=6.0",
+    "pyusb>=1.0",
+    "pycryptodome",
+    "pyserial",
+    "colorama",
+]
+
+[project.scripts]
+tumeloroot = "tumeloroot.app:main"
+
+[tool.setuptools.packages.find]
+include = ["tumeloroot*"]

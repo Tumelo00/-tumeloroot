@@ -1,0 +1,51 @@
+device:
+  manufacturer: Lenovo
+  model: Tab K11
+  codename: TB330XUP
+  android_version: 15
+
+chipset:
+  name: "MT6768/MT6769 (Helio P65/G85)"
+  hwcode: "0x707"
+  usb_vid: "0x0E8D"
+  usb_pid: "0x0003"
+
+boot_structure:
+  kernel_partition: boot
+  ramdisk_partition: vendor_boot
+  init_boot_used: false
+  ab_device: true
+
+partitions:
+  backup_list:
+    - seccfg
+    - boot_a
+    - boot_b
+    - vendor_boot_a
+    - vendor_boot_b
+    - vbmeta_a
+    - vbmeta_b
+  root_target: vendor_boot
+  flash_targets:
+    - vendor_boot_a
+    - vendor_boot_b
+
+vbmeta:
+  flags_offset: 0x78
+  flags_value: 3
+  partitions:
+    - vbmeta_a
+    - vbmeta_b
+    - vbmeta_system_a
+    - vbmeta_system_b
+    - vbmeta_vendor_a
+    - vbmeta_vendor_b
+
+brom_instructions:
+  steps:
+    - "Power off the device completely"
+    - "Hold Power + Vol Up + Vol Down buttons together"
+    - "While holding all 3 buttons, plug in the USB cable"
+    - "Release ONLY the Power button (keep holding Vol Up + Vol Down)"
+    - "Wait 3-5 seconds, then release Vol Up + Vol Down"
+    - "Auto-detection will handle the rest"

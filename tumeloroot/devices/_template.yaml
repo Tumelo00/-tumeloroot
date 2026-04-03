@@ -1,0 +1,55 @@
+# Tumeloroot Device Profile Template
+# Copy this file and rename it to your device codename (e.g., my_device.yaml)
+# Fill in all fields based on your device's specifications.
+#
+# How to find these values:
+# - hwcode: shown by mtkclient during BROM connection ("HW code: 0xNNN")
+# - ramdisk_partition: the partition that contains the ramdisk (boot, init_boot, or vendor_boot)
+#   Use `magiskboot unpack <image>` to check which image has RAMDISK_SZ > 0
+# - ab_device: check with `adb shell getprop ro.boot.slot_suffix` (if returns _a or _b, it's A/B)
+
+device:
+  manufacturer: ""        # e.g., Lenovo, Samsung, Xiaomi
+  model: ""               # e.g., Tab K11
+  codename: ""            # e.g., TB330XUP (unique identifier)
+  android_version: 15     # Android version number
+
+chipset:
+  name: ""                # e.g., MT6768/MT6769 (Helio P65/G85)
+  hwcode: "0x000"         # Hardware code in hex (from mtkclient output)
+  usb_vid: "0x0E8D"       # USB Vendor ID (usually 0x0E8D for MediaTek)
+  usb_pid: "0x0003"       # USB Product ID in BROM mode
+
+boot_structure:
+  kernel_partition: boot          # Partition containing the kernel
+  ramdisk_partition: vendor_boot  # CRITICAL: partition containing the ramdisk
+  init_boot_used: false           # Whether init_boot contains data
+  ab_device: true                 # Whether device uses A/B slot scheme
+
+partitions:
+  backup_list:              # Partitions to backup before any modifications
+    - seccfg
+    - boot_a
+    - boot_b
+    - vendor_boot_a
+    - vendor_boot_b
+    - vbmeta_a
+    - vbmeta_b
+  root_target: vendor_boot  # Partition that Magisk will patch
+  flash_targets:             # Partitions to flash the patched image to
+    - vendor_boot_a
+    - vendor_boot_b
+
+vbmeta:
+  flags_offset: 0x78       # Offset of flags field in vbmeta (usually 0x78)
+  flags_value: 3            # 3 = disable verification + disable hashtree
+  partitions:               # All vbmeta partitions to patch
+    - vbmeta_a
+    - vbmeta_b
+
+brom_instructions:
+  steps:
+    - "Power off the device completely"
+    - "Hold Vol Up + Vol Down buttons simultaneously"
+    - "While holding buttons, connect USB cable to PC"
+    - "Keep holding for 5-10 seconds until detected"

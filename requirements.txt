@@ -1,0 +1,6 @@
+PySide6>=6.5
+PyYAML>=6.0
+pyusb>=1.0
+pycryptodome
+pyserial
+colorama
