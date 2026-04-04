@@ -63,6 +63,23 @@ python -m tumeloroot
 
 If you prefer to root manually without the Tumeloroot GUI, or you are on a native Linux system, follow the steps below. This guide uses **mtkclient** for bootloader unlocking and partition operations via BROM exploit — no fastboot required for the critical steps.
 
+### Pre-Flight Checklist
+
+Before starting, go through this checklist:
+
+- [ ] Tablet battery is **at least 50%** charged (a dead battery during flash = potential brick)
+- [ ] You have a **data-capable USB-C cable** (not a charge-only cable — see how to test below)
+- [ ] You have **at least 500 MB free disk space** on your Linux computer (for images + backups)
+- [ ] You have **backed up** all important data on the tablet (photos, contacts, app data — everything will be erased)
+- [ ] You are **not** using a USB hub — connect directly to your computer's USB port
+- [ ] Your Linux user has **sudo** privileges
+
+**How to test if your USB cable supports data transfer:**
+1. Connect the tablet to your computer with the cable
+2. On the tablet notification bar, check if it says "USB for file transfer" or similar
+3. If you only see "Charging" with no file transfer option, the cable is charge-only — use a different cable
+4. Alternatively: if `adb devices` shows the device, the cable works
+
 **Before you start, understand these concepts:**
 
 | Term | Meaning |
@@ -73,6 +90,10 @@ If you prefer to root manually without the Tumeloroot GUI, or you are on a nativ
 | **vendor_boot** | The partition that holds the kernel ramdisk on GKI (Generic Kernel Image) devices. On older devices this was in `boot`, but Android 13+ with GKI uses `vendor_boot` instead. Magisk patches this partition |
 | **A/B slots** | This device has two copies of every system partition (`_a` and `_b`). Android switches between them for seamless updates. We flash our patched image to **both** slots so root survives any slot switch |
 | **Magisk** | The root framework. It patches the vendor_boot image to inject `su` (superuser) access while keeping the system partition untouched |
+| **seccfg** | Security configuration partition on MediaTek devices. Stores the bootloader lock state. Erasing it with mtkclient unlocks the bootloader |
+| **Partition** | A section of the device's internal storage, like a hard drive partition on a PC. Each partition holds a specific part of the system (kernel, system apps, user data, etc.) |
+| **Flash** | Writing a raw image file directly to a partition. This replaces the partition's entire contents |
+| **Brick** | When a device becomes unbootable and unresponsive — essentially a "brick". Having backups and BROM access prevents permanent bricks on MediaTek devices |
 
 ---
 
@@ -169,7 +190,16 @@ groups
 ```
 You should see `plugdev` in the output.
 
-#### 1.5 — Create working directory and download Magisk
+#### 1.5 — Verify everything is installed correctly
+
+Run all verification commands at once:
+```bash
+echo "=== ADB ===" && adb version | head -1 && echo "=== Python ===" && python3 --version && echo "=== mtkclient ===" && python3 -m mtk --help 2>&1 | head -1 && echo "=== USB permissions ===" && groups | grep -o plugdev && echo "=== All checks passed ==="
+```
+
+If any command fails, go back to the relevant step above and fix it before proceeding.
+
+#### 1.6 — Create working directory and download Magisk
 
 ```bash
 mkdir -p ~/lenovo_root
@@ -188,7 +218,33 @@ Verify the download:
 ls -lh ~/lenovo_root/Magisk.apk
 ```
 
-The file should be a few MB in size. If it is 0 bytes, the download failed — check the URL.
+The file should be a few MB in size (typically 10-15 MB). If it is 0 bytes or shows an HTML error page, the download failed — check the URL.
+
+Verify it is a valid APK (not an error page):
+```bash
+file ~/lenovo_root/Magisk.apk
+```
+
+Expected: `Zip archive data` or `Java archive data`. If it says `HTML document`, the URL was wrong — re-download.
+
+#### 1.7 — Summary of files in working directory
+
+At this point your `~/lenovo_root/` directory should contain:
+```
+~/lenovo_root/
+└── Magisk.apk          (Magisk installer, ~10-15 MB)
+```
+
+By the end of the process, it will look like:
+```
+~/lenovo_root/
+├── Magisk.apk                        (Magisk installer)
+├── vendor_boot_a.img                 (extracted from device)
+├── vendor_boot_b.img                 (extracted from device)
+├── vendor_boot_a_BACKUP.img          (safety backup — DO NOT DELETE)
+├── vendor_boot_b_BACKUP.img          (safety backup — DO NOT DELETE)
+└── magisk_patched_vendor_boot.img    (patched by Magisk — this gets flashed)
+```
 
 ---
 
@@ -254,6 +310,14 @@ adb shell getprop ro.boot.hardware
 
 Save this output somewhere — it confirms you are working with the correct device.
 
+For Lenovo Tab K11, expected values:
+```
+ro.product.model: TB330XUP
+ro.boot.hardware: mt8786
+```
+
+If your model is different, the partition layout may differ. This guide is specifically written for the **TB330XUP**.
+
 ---
 
 ### Step 3 — Unlock Bootloader via BROM (mtkclient)
@@ -288,11 +352,20 @@ Done.
 
 If you see `Done`, the bootloader is now unlocked. The device will factory reset on the next boot.
 
+> **What just happened?** The `seccfg` (security configuration) partition stores whether the bootloader is locked or unlocked. By erasing it, the device defaults to "unlocked" state. This is a MediaTek-specific mechanism — other manufacturers use different methods.
+
 **If mtkclient says "Waiting for device":**
 - Unplug the USB cable
 - Make sure the tablet is completely powered off (hold power for 15 seconds to force off)
 - Try again: hold Vol Up + Vol Down → plug USB
 - Try a different USB port (USB 2.0 ports sometimes work better than USB 3.0)
+- On some systems, you may need to run with `sudo`: `sudo python3 -m mtk e seccfg`
+- Check `dmesg | tail -20` to see if the USB device is detected at all
+
+**If mtkclient says "DAInit failed" or similar error:**
+- This can happen if the device is not fully powered off
+- Remove USB cable, hold power button for 30 seconds to fully drain any residual power
+- Wait 5 seconds, then try the BROM entry sequence again
 
 ---
 
@@ -336,7 +409,20 @@ ls -lh ~/lenovo_root/vendor_boot_a.img ~/lenovo_root/vendor_boot_b.img
 
 Both files should be approximately **64 MB** (67108864 bytes). If either file is 0 bytes or missing, re-enter BROM mode and try again.
 
-#### 4.5 — Create backup copies
+#### 4.5 — Verify file integrity with checksums
+
+Generate checksums so you can verify the files are not corrupted:
+```bash
+sha256sum ~/lenovo_root/vendor_boot_a.img ~/lenovo_root/vendor_boot_b.img
+```
+
+Save the output somewhere. If you ever need to verify a file hasn't changed:
+```bash
+sha256sum ~/lenovo_root/vendor_boot_a_BACKUP.img
+# Compare with the original hash
+```
+
+#### 4.6 — Create backup copies
 
 These backups are your safety net. If anything goes wrong, you can restore them:
 
@@ -363,7 +449,7 @@ Unplug USB, then hold the power button to turn on the tablet. The first boot aft
 - Factory reset the device
 - Show the initial setup wizard
 
-This first boot may take 2-5 minutes. Be patient.
+This first boot may take 2-5 minutes. **Do not press any buttons or unplug during this time.** Be patient — the device is reformatting its data partition.
 
 #### 5.2 — Complete initial setup
 
@@ -438,6 +524,8 @@ Now pick up the tablet and do the following:
 
 The patched file is now saved in `/sdcard/Download/` with a name like `magisk_patched-28100_XXXXX.img`.
 
+> **What does Magisk do during patching?** It unpacks the vendor_boot image, injects the Magisk init binary into the ramdisk, re-packs the image, and signs it. The result is a vendor_boot that loads Magisk's init process before Android starts, giving it root-level control.
+
 ---
 
 ### Step 7 — Pull the Patched Image to Computer
@@ -471,9 +559,20 @@ ls -lh ~/lenovo_root/magisk_patched_vendor_boot.img
 
 The file should be approximately **64 MB**, same as the original. If it is significantly smaller or 0 bytes, the patch failed — repeat Step 6.
 
+Compare the size with the original to make sure they match:
+```bash
+ls -l ~/lenovo_root/vendor_boot_a.img ~/lenovo_root/magisk_patched_vendor_boot.img
+```
+
+Both files must have the **exact same byte count**. If they differ, something went wrong during patching.
+
 ---
 
 ### Step 8 — Flash Patched Image via BROM (mtkclient)
+
+Now we write the Magisk-patched vendor_boot image back to the tablet, replacing the original on both slots.
+
+> **Is this dangerous?** Writing a partition is the most critical step. If the power goes out or the USB cable disconnects during a write, the partition could be left in a corrupted state. However, since we are using **BROM mode** (hardware-level access), you can always re-enter BROM and re-flash — even if the device does not boot. This is the advantage of MediaTek devices: **BROM access is always available regardless of software state.** As long as you have your backup files, you cannot permanently brick the device.
 
 Now we write the Magisk-patched vendor_boot image back to the tablet, replacing the original on both slots.
 
@@ -605,6 +704,71 @@ Reboot the tablet. It will boot with the stock vendor_boot — no root.
 | Device stuck in boot loop after flash | Flash the backup images via BROM (see "Restoring Stock" above) |
 | `su -c 'id'` returns "permission denied" | Tap "Allow" on the Magisk dialog on the tablet. If no dialog, open Magisk app → Superuser tab → check if Shell has permission |
 | Bootloader warning on every boot | This is normal for unlocked bootloaders. It will appear every time you boot. Just wait a few seconds and the device continues booting |
+
+---
+
+### Common Mistakes — What NOT to Do
+
+| Mistake | Why It's Bad |
+|---------|--------------|
+| Flashing `boot` instead of `vendor_boot` | GKI devices use vendor_boot for the ramdisk. Patching boot will have no effect, or worse, could cause a boot loop |
+| Installing Magisk modules on this device | Lenovo Tab K11 boot loops with Magisk modules. Do NOT install any modules |
+| Using `service.d` scripts | Same as modules — causes boot loop on this device |
+| Removing Motorola system packages | This device has hidden Motorola dependencies (AudioService, ColorDisplayService). Removing them causes SystemServer crash → boot loop |
+| Changing volume values via `settings put` | Can crash AudioPolicyManager. Use the volume buttons instead |
+| Unplugging USB during a `mtk w` (write) operation | Can corrupt the partition. If this happens, re-enter BROM and re-flash the backup |
+| Skipping the backup step | Without backups, a bad flash means you need a full stock firmware to recover |
+| Using a charge-only USB cable | BROM mode requires data transfer. If mtkclient can't detect the device, the cable might be charge-only |
+| Running mtkclient without udev rules | Results in "Permission denied" or "Waiting for device". Set up udev rules first (Step 1.4) |
+| Patching vendor_boot_b instead of vendor_boot_a in Magisk | Always patch the **active slot's** image (usually `_a`). We push `vendor_boot_a.img` to the tablet for patching, then flash the result to both slots |
+
+---
+
+### Frequently Asked Questions
+
+**Q: Will I lose my data?**
+A: Yes, unlocking the bootloader (Step 3) triggers a factory reset. Back up everything first. After that, the remaining steps (patching, flashing) do NOT erase data.
+
+**Q: Will this void my warranty?**
+A: Unlocking the bootloader may void the warranty depending on your region and manufacturer policy. Lenovo's policy varies by market.
+
+**Q: Can I get OTA (over-the-air) updates after rooting?**
+A: OTA updates will likely fail because the vendor_boot partition has been modified. If you want to update, restore stock first, apply the update, then re-root.
+
+**Q: Can I re-lock the bootloader after rooting?**
+A: Technically possible, but **not recommended** while rooted. Re-locking with a modified vendor_boot will trigger Android Verified Boot and the device will not boot. Restore stock first if you want to re-lock.
+
+**Q: Is BROM mode the same as fastboot?**
+A: No. Fastboot is an Android bootloader feature — it requires the bootloader to be running. BROM is a hardware-level mode built into the MediaTek chip itself — it works even if the bootloader, Android, or anything else is completely broken. BROM is always available on MediaTek devices.
+
+**Q: My device shows "orange state" or "unlocked bootloader" warning on boot — is this normal?**
+A: Yes. This warning appears every time an unlocked device boots. It does not affect functionality. The device will continue booting normally after a few seconds.
+
+**Q: I flashed the wrong file / wrong partition. What do I do?**
+A: Enter BROM mode and flash the backup file. BROM access is always available, so you can always recover. This is why we create backups in Step 4.
+
+**Q: Do I need internet on my Linux machine during the process?**
+A: Only for Step 1 (downloading tools and Magisk). Steps 2-9 are fully offline — all communication happens over USB.
+
+**Q: How long does the entire process take?**
+A: Approximately 20-40 minutes for a first-timer, including the factory reset setup time. Experienced users can do it in 10-15 minutes.
+
+---
+
+### Device Partition Map (Lenovo Tab K11 — TB330XUP)
+
+For reference, these are the relevant partitions on this device:
+
+| Partition | Block Device | Size | Purpose |
+|-----------|-------------|------|---------|
+| `vendor_boot_a` | `/dev/block/mmcblk0p29` | 64 MB | Kernel ramdisk (slot A) — **Magisk patches this** |
+| `vendor_boot_b` | `/dev/block/mmcblk0p47` | 64 MB | Kernel ramdisk (slot B) — **Magisk patches this** |
+| `seccfg` | varies | small | Bootloader lock state — **erased to unlock** |
+| `boot_a` / `boot_b` | varies | varies | GKI kernel image (do NOT patch on this device) |
+| `vbmeta_a` / `vbmeta_b` | varies | varies | Android Verified Boot metadata |
+| `userdata` | varies | large | User data, apps, settings (wiped on bootloader unlock) |
+
+> This partition map is specific to the TB330XUP. Other devices will have different layouts.
 
 ---
 
