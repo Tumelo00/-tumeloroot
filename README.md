@@ -61,196 +61,308 @@ python -m tumeloroot
 
 ## Manual Root Guide for Linux Users
 
-If you prefer to root manually without the Tumeloroot GUI, or you are on a native Linux system without WSL, follow the steps below using standard command-line tools.
+If you prefer to root manually without the Tumeloroot GUI, or you are on a native Linux system, follow the steps below. This guide uses **mtkclient** for bootloader unlocking and partition operations via BROM exploit — no fastboot required for the critical steps.
 
-### Prerequisites
+> **Why vendor_boot?** This device uses Android 15 with GKI (Generic Kernel Image). On GKI devices, the ramdisk lives in `vendor_boot`, not `boot`. Magisk must patch `vendor_boot`.
 
-**ADB and Fastboot:**
+> **A/B Slots:** This device has two slots (`_a` and `_b`). We flash the patched image to both slots for reliability.
+
+---
+
+### Step 1 — Install ADB and mtkclient
+
+Install ADB (for communicating with the tablet while Android is running) and mtkclient (for BROM-level operations):
 
 ```bash
 # Ubuntu / Debian
-sudo apt update && sudo apt install -y adb fastboot
+sudo apt update && sudo apt install -y adb python3 python3-pip libusb-1.0-0
 
 # Arch Linux
-sudo pacman -S android-tools
+sudo pacman -S android-tools python python-pip libusb
 
 # Fedora
-sudo dnf install -y android-tools
+sudo dnf install -y android-tools python3 python3-pip libusb
 ```
 
-Or install manually from Google:
+Install mtkclient:
 ```bash
-cd ~
-wget https://dl.google.com/android/repository/platform-tools-latest-linux.zip
-unzip platform-tools-latest-linux.zip
-echo 'export PATH="$HOME/platform-tools:$PATH"' >> ~/.bashrc
-source ~/.bashrc
+pip3 install mtkclient
 ```
 
-Verify the installation:
-```bash
-adb version
-fastboot --version
-```
-
-**USB permissions (udev rules):**
-
+Set up USB permissions so both ADB and mtkclient can access the device without `sudo`:
 ```bash
 sudo tee /etc/udev/rules.d/51-android.rules <<'EOF'
-# Lenovo
+# Lenovo (ADB)
 SUBSYSTEM=="usb", ATTR{idVendor}=="17ef", MODE="0666", GROUP="plugdev"
-# MediaTek Fastboot / Preloader
+# MediaTek BROM / Preloader (mtkclient)
 SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", MODE="0666", GROUP="plugdev"
 EOF
 sudo udevadm control --reload-rules && sudo udevadm trigger
 sudo usermod -aG plugdev $USER
 ```
 
-> Log out and back in after the group change.
+> **Log out and back in** for the group change to take effect.
 
-**Magisk APK:**
+Verify the installations:
+```bash
+adb version
+python3 -m mtk --help
+```
 
-Download the latest release from the [Magisk GitHub releases page](https://github.com/topjohnwu/Magisk/releases).
-
-**Create a working directory:**
+Create a working directory for all files:
 ```bash
 mkdir -p ~/lenovo_root && cd ~/lenovo_root
 ```
 
-### Step 1 — Prepare the Device
+Download the latest Magisk APK from [GitHub releases](https://github.com/topjohnwu/Magisk/releases) and save it to `~/lenovo_root/Magisk.apk`.
+
+---
+
+### Step 2 — Enable USB Debugging and Authorize ADB
 
 On the **tablet**:
 
-1. Go to **Settings > About Tablet**, tap **Build Number** 7 times to enable Developer Options
+1. Go to **Settings > About Tablet**, tap **Build Number** 7 times
+   → "You are now a developer!" message appears
 2. Go to **Settings > Developer Options**, enable:
-   - **USB Debugging** — ON
-   - **OEM Unlocking** — ON
-3. Connect the tablet via USB
-4. Approve the **"Allow USB debugging?"** dialog on the tablet (check "Always allow")
+   - **USB Debugging** → ON
+   - **OEM Unlocking** → ON
+3. Connect the tablet to your computer via USB-C cable
+4. A dialog appears on the tablet: **"Allow USB debugging?"**
+   → Check **"Always allow from this computer"** → tap **Allow**
 
-Verify connection from your terminal:
+Verify the connection from your terminal:
 ```bash
 adb devices
-# Expected output:
-# XXXXXXXXX    device
 ```
 
-### Step 2 — Unlock the Bootloader
-
-> **This will factory reset the device. All data will be erased.**
-
-```bash
-adb reboot bootloader
+Expected output:
+```
+List of devices attached
+XXXXXXXXX    device
 ```
 
-Wait for the fastboot screen, then:
-```bash
-fastboot devices                  # verify device is visible
-fastboot flashing unlock          # send unlock command
-```
+If it says `unauthorized`, check the tablet for the permission dialog and approve it.
 
-On the tablet screen: use volume keys to select **"Unlock the bootloader"** and confirm with the power button.
-
-The device will wipe and reboot. After the initial setup completes, repeat Step 1 (enable Developer Options and USB Debugging again).
-
-### Step 3 — Extract the vendor_boot Image
-
-> **Why vendor_boot?** Devices with Android 13+ using GKI (Generic Kernel Image) store the ramdisk in `vendor_boot`, not `boot`. Magisk patches `vendor_boot` on these devices.
-
-Find the active slot:
+Note the active slot (you will need this later):
 ```bash
 adb shell getprop ro.boot.slot_suffix
-# Returns _a or _b
 ```
 
-Extract using one of these methods:
+This returns `_a` or `_b`. Write it down.
 
-**Method A — mtkclient (no root needed):**
+---
+
+### Step 3 — Unlock Bootloader via BROM (mtkclient)
+
+> **WARNING: Unlocking the bootloader will factory reset the device. All data will be erased.**
+
+Power off the tablet completely. Then enter BROM mode:
+
+1. **Hold Vol Up + Vol Down** buttons on the tablet
+2. **While holding both buttons**, plug the USB cable into the tablet
+3. Keep holding until mtkclient detects the device
+
+Run the unlock command:
 ```bash
-pip3 install mtkclient
-# Power off the tablet completely, hold Vol Up + Vol Down, then plug USB
-mtk r vendor_boot_<slot> ~/lenovo_root/vendor_boot.img
+python3 -m mtk e seccfg
 ```
 
-**Method B — ADB with root (if device is already rooted):**
+Expected output (last lines):
+```
+Erasing seccfg ...
+Done.
+```
+
+The bootloader is now unlocked. The device will factory reset on the next boot.
+
+---
+
+### Step 4 — Extract vendor_boot via BROM (mtkclient)
+
+While still in BROM mode (or re-enter: power off → hold Vol Up + Vol Down → plug USB):
+
 ```bash
-adb shell su -c 'dd if=/dev/block/by-name/vendor_boot_<slot> of=/sdcard/vendor_boot.img bs=4096'
-adb pull /sdcard/vendor_boot.img ~/lenovo_root/vendor_boot.img
-adb shell rm /sdcard/vendor_boot.img
+python3 -m mtk r vendor_boot_a ~/lenovo_root/vendor_boot_a.img
 ```
 
-> Replace `<slot>` with `_a` or `_b` depending on the active slot.
-
-**Back up the original immediately:**
+Re-enter BROM mode, then extract the second slot as backup:
 ```bash
-cp ~/lenovo_root/vendor_boot.img ~/lenovo_root/vendor_boot_ORIGINAL_BACKUP.img
+python3 -m mtk r vendor_boot_b ~/lenovo_root/vendor_boot_b.img
 ```
 
-### Step 4 — Patch with Magisk
+Verify the files:
+```bash
+ls -lh ~/lenovo_root/vendor_boot_*.img
+```
 
-Install Magisk on the tablet and send the image:
+Both files should be approximately 64 MB. If either is 0 bytes, the extraction failed — retry.
+
+Save backup copies:
+```bash
+cp ~/lenovo_root/vendor_boot_a.img ~/lenovo_root/vendor_boot_a_BACKUP.img
+cp ~/lenovo_root/vendor_boot_b.img ~/lenovo_root/vendor_boot_b_BACKUP.img
+```
+
+> **Keep these backups safe.** You will need them to restore stock if something goes wrong.
+
+---
+
+### Step 5 — First Boot After Unlock + Re-enable ADB
+
+Reboot the tablet by disconnecting USB and holding the power button. The device will factory reset and show the initial setup wizard.
+
+1. Complete the initial setup (WiFi, Google account, etc.)
+2. **Repeat Step 2**: enable Developer Options, USB Debugging, and authorize ADB
+3. Reconnect USB and verify:
+
+```bash
+adb devices
+# Should show: XXXXXXXXX    device
+```
+
+---
+
+### Step 6 — Install Magisk and Patch vendor_boot
+
+Install the Magisk app on the tablet and push the extracted vendor_boot image:
 ```bash
 adb install ~/lenovo_root/Magisk.apk
-adb push ~/lenovo_root/vendor_boot.img /sdcard/Download/vendor_boot.img
+adb push ~/lenovo_root/vendor_boot_a.img /sdcard/Download/vendor_boot.img
 ```
 
-On the **tablet**:
+Now on the **tablet**:
 
-1. Open **Magisk**
-2. Tap **Install** next to "Magisk"
+1. Open the **Magisk** app
+2. Tap **Install** (next to "Magisk" on the home screen)
 3. Select **"Select and Patch a File"**
-4. Navigate to **Downloads**, select **vendor_boot.img**
-5. Wait for **"All done!"**
+4. Navigate to **Downloads** folder
+5. Select **vendor_boot.img**
+6. Wait until you see **"All done!"**
 
-Pull the patched image back:
+---
+
+### Step 7 — Pull the Patched Image to Computer
+
+Find and pull the patched file:
 ```bash
-# Check the file name
 adb shell ls /sdcard/Download/magisk_patched*
+```
 
-# Pull it (replace XXXXX with actual number from output above)
+This shows something like `magisk_patched-28100_XXXXX.img`. Pull it:
+```bash
 adb pull /sdcard/Download/magisk_patched-XXXXX.img ~/lenovo_root/magisk_patched_vendor_boot.img
 ```
 
-### Step 5 — Flash the Patched Image
+> Replace `XXXXX` with the actual number from the output above.
 
+Verify the file:
 ```bash
-adb reboot bootloader
-# Wait ~10 seconds for fastboot mode
-fastboot devices
-fastboot flash vendor_boot_<slot> ~/lenovo_root/magisk_patched_vendor_boot.img
-fastboot reboot
+ls -lh ~/lenovo_root/magisk_patched_vendor_boot.img
 ```
 
-> Replace `<slot>` with `_a` or `_b`.
+Should be approximately the same size as the original vendor_boot (~64 MB).
 
-### Step 6 — Verify Root
+---
 
-After the device finishes booting:
+### Step 8 — Flash Patched Image via BROM (mtkclient)
+
+Power off the tablet. Enter BROM mode (hold Vol Up + Vol Down → plug USB).
+
+Flash the patched image to **both slots** for reliability:
+```bash
+python3 -m mtk w vendor_boot_a ~/lenovo_root/magisk_patched_vendor_boot.img
+```
+
+Re-enter BROM mode, then flash the second slot:
+```bash
+python3 -m mtk w vendor_boot_b ~/lenovo_root/magisk_patched_vendor_boot.img
+```
+
+---
+
+### Step 9 — Reboot and Verify Root
+
+Disconnect USB, power on the tablet normally. Wait for it to fully boot.
+
+Reconnect USB and test root access:
 ```bash
 adb shell su -c 'id'
 ```
 
-> A Magisk permission dialog will appear on the tablet — tap **Allow**.
+> A Magisk superuser permission dialog will appear on the tablet — tap **Allow**.
 
 Expected output:
 ```
 uid=0(root) gid=0(root) groups=0(root) context=u:r:magisk:s0
 ```
 
-If you see `uid=0(root)` — root is working.
+If you see `uid=0(root)` — **root is successful!**
 
+Verify Magisk version:
 ```bash
-adb shell su -c 'magisk -v'    # Magisk version string
-adb shell su -c 'magisk -V'    # Magisk version code
+adb shell su -c 'magisk -v'
+adb shell su -c 'magisk -V'
 ```
+
+---
 
 ### Restoring Stock (Unroot)
 
-Flash the original backup to remove root:
+If you need to remove root or fix a boot issue, flash the original backups via BROM.
+
+Power off the tablet. Enter BROM mode (Vol Up + Vol Down → plug USB):
 ```bash
-adb reboot bootloader
-fastboot flash vendor_boot_<slot> ~/lenovo_root/vendor_boot_ORIGINAL_BACKUP.img
-fastboot reboot
+python3 -m mtk w vendor_boot_a ~/lenovo_root/vendor_boot_a_BACKUP.img
+```
+
+Re-enter BROM mode:
+```bash
+python3 -m mtk w vendor_boot_b ~/lenovo_root/vendor_boot_b_BACKUP.img
+```
+
+Reboot — the device will boot with stock vendor_boot, no root.
+
+---
+
+### Quick Reference — Full Command Sequence
+
+```bash
+# Step 1: Install tools
+sudo apt update && sudo apt install -y adb python3 python3-pip libusb-1.0-0
+pip3 install mtkclient
+
+# Step 2: Verify ADB connection
+adb devices
+adb shell getprop ro.boot.slot_suffix    # note: _a or _b
+
+# Step 3: Unlock bootloader (BROM — power off, Vol Up+Down, plug USB)
+python3 -m mtk e seccfg
+
+# Step 4: Extract vendor_boot (re-enter BROM for each)
+python3 -m mtk r vendor_boot_a ~/lenovo_root/vendor_boot_a.img
+python3 -m mtk r vendor_boot_b ~/lenovo_root/vendor_boot_b.img
+cp ~/lenovo_root/vendor_boot_a.img ~/lenovo_root/vendor_boot_a_BACKUP.img
+cp ~/lenovo_root/vendor_boot_b.img ~/lenovo_root/vendor_boot_b_BACKUP.img
+
+# Step 5: (tablet) complete setup, re-enable USB debugging
+adb devices
+
+# Step 6: Install Magisk, push image, patch on tablet
+adb install ~/lenovo_root/Magisk.apk
+adb push ~/lenovo_root/vendor_boot_a.img /sdcard/Download/vendor_boot.img
+# -> Tablet: Magisk > Install > Select and Patch a File > vendor_boot.img
+
+# Step 7: Pull patched image
+adb pull /sdcard/Download/magisk_patched-XXXXX.img ~/lenovo_root/magisk_patched_vendor_boot.img
+
+# Step 8: Flash patched image (BROM — power off, Vol Up+Down, plug USB)
+python3 -m mtk w vendor_boot_a ~/lenovo_root/magisk_patched_vendor_boot.img
+python3 -m mtk w vendor_boot_b ~/lenovo_root/magisk_patched_vendor_boot.img
+
+# Step 9: Reboot, verify root
+adb shell su -c 'id'
+# uid=0(root) = SUCCESS
 ```
 
 ---
