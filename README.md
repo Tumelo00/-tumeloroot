@@ -59,6 +59,202 @@ pip install -e .
 python -m tumeloroot
 ```
 
+## Manual Root Guide for Linux Users
+
+If you prefer to root manually without the Tumeloroot GUI, or you are on a native Linux system without WSL, follow the steps below using standard command-line tools.
+
+### Prerequisites
+
+**ADB and Fastboot:**
+
+```bash
+# Ubuntu / Debian
+sudo apt update && sudo apt install -y adb fastboot
+
+# Arch Linux
+sudo pacman -S android-tools
+
+# Fedora
+sudo dnf install -y android-tools
+```
+
+Or install manually from Google:
+```bash
+cd ~
+wget https://dl.google.com/android/repository/platform-tools-latest-linux.zip
+unzip platform-tools-latest-linux.zip
+echo 'export PATH="$HOME/platform-tools:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Verify the installation:
+```bash
+adb version
+fastboot --version
+```
+
+**USB permissions (udev rules):**
+
+```bash
+sudo tee /etc/udev/rules.d/51-android.rules <<'EOF'
+# Lenovo
+SUBSYSTEM=="usb", ATTR{idVendor}=="17ef", MODE="0666", GROUP="plugdev"
+# MediaTek Fastboot / Preloader
+SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", MODE="0666", GROUP="plugdev"
+EOF
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -aG plugdev $USER
+```
+
+> Log out and back in after the group change.
+
+**Magisk APK:**
+
+Download the latest release from the [Magisk GitHub releases page](https://github.com/topjohnwu/Magisk/releases).
+
+**Create a working directory:**
+```bash
+mkdir -p ~/lenovo_root && cd ~/lenovo_root
+```
+
+### Step 1 — Prepare the Device
+
+On the **tablet**:
+
+1. Go to **Settings > About Tablet**, tap **Build Number** 7 times to enable Developer Options
+2. Go to **Settings > Developer Options**, enable:
+   - **USB Debugging** — ON
+   - **OEM Unlocking** — ON
+3. Connect the tablet via USB
+4. Approve the **"Allow USB debugging?"** dialog on the tablet (check "Always allow")
+
+Verify connection from your terminal:
+```bash
+adb devices
+# Expected output:
+# XXXXXXXXX    device
+```
+
+### Step 2 — Unlock the Bootloader
+
+> **This will factory reset the device. All data will be erased.**
+
+```bash
+adb reboot bootloader
+```
+
+Wait for the fastboot screen, then:
+```bash
+fastboot devices                  # verify device is visible
+fastboot flashing unlock          # send unlock command
+```
+
+On the tablet screen: use volume keys to select **"Unlock the bootloader"** and confirm with the power button.
+
+The device will wipe and reboot. After the initial setup completes, repeat Step 1 (enable Developer Options and USB Debugging again).
+
+### Step 3 — Extract the vendor_boot Image
+
+> **Why vendor_boot?** Devices with Android 13+ using GKI (Generic Kernel Image) store the ramdisk in `vendor_boot`, not `boot`. Magisk patches `vendor_boot` on these devices.
+
+Find the active slot:
+```bash
+adb shell getprop ro.boot.slot_suffix
+# Returns _a or _b
+```
+
+Extract using one of these methods:
+
+**Method A — mtkclient (no root needed):**
+```bash
+pip3 install mtkclient
+# Power off the tablet completely, hold Vol Up + Vol Down, then plug USB
+mtk r vendor_boot_<slot> ~/lenovo_root/vendor_boot.img
+```
+
+**Method B — ADB with root (if device is already rooted):**
+```bash
+adb shell su -c 'dd if=/dev/block/by-name/vendor_boot_<slot> of=/sdcard/vendor_boot.img bs=4096'
+adb pull /sdcard/vendor_boot.img ~/lenovo_root/vendor_boot.img
+adb shell rm /sdcard/vendor_boot.img
+```
+
+> Replace `<slot>` with `_a` or `_b` depending on the active slot.
+
+**Back up the original immediately:**
+```bash
+cp ~/lenovo_root/vendor_boot.img ~/lenovo_root/vendor_boot_ORIGINAL_BACKUP.img
+```
+
+### Step 4 — Patch with Magisk
+
+Install Magisk on the tablet and send the image:
+```bash
+adb install ~/lenovo_root/Magisk.apk
+adb push ~/lenovo_root/vendor_boot.img /sdcard/Download/vendor_boot.img
+```
+
+On the **tablet**:
+
+1. Open **Magisk**
+2. Tap **Install** next to "Magisk"
+3. Select **"Select and Patch a File"**
+4. Navigate to **Downloads**, select **vendor_boot.img**
+5. Wait for **"All done!"**
+
+Pull the patched image back:
+```bash
+# Check the file name
+adb shell ls /sdcard/Download/magisk_patched*
+
+# Pull it (replace XXXXX with actual number from output above)
+adb pull /sdcard/Download/magisk_patched-XXXXX.img ~/lenovo_root/magisk_patched_vendor_boot.img
+```
+
+### Step 5 — Flash the Patched Image
+
+```bash
+adb reboot bootloader
+# Wait ~10 seconds for fastboot mode
+fastboot devices
+fastboot flash vendor_boot_<slot> ~/lenovo_root/magisk_patched_vendor_boot.img
+fastboot reboot
+```
+
+> Replace `<slot>` with `_a` or `_b`.
+
+### Step 6 — Verify Root
+
+After the device finishes booting:
+```bash
+adb shell su -c 'id'
+```
+
+> A Magisk permission dialog will appear on the tablet — tap **Allow**.
+
+Expected output:
+```
+uid=0(root) gid=0(root) groups=0(root) context=u:r:magisk:s0
+```
+
+If you see `uid=0(root)` — root is working.
+
+```bash
+adb shell su -c 'magisk -v'    # Magisk version string
+adb shell su -c 'magisk -V'    # Magisk version code
+```
+
+### Restoring Stock (Unroot)
+
+Flash the original backup to remove root:
+```bash
+adb reboot bootloader
+fastboot flash vendor_boot_<slot> ~/lenovo_root/vendor_boot_ORIGINAL_BACKUP.img
+fastboot reboot
+```
+
+---
+
 ## Adding New Device Support
 
 1. Copy `tumeloroot/devices/_template.yaml` to a new file
