@@ -239,7 +239,7 @@ class PatchPage(QWizardPage):
             self._status.setText(
                 "UNLOCK + ROOT COMPLETE!\n"
                 "Reboot device and HOLD Power button during orange state warning.\n"
-                "Then install Magisk APK and select 'Install to Inactive Slot'."
+                "Install Magisk APK > try 'Direct Install' first, otherwise 'Install to Inactive Slot'."
             )
             self._status.setStyleSheet(
                 "color: #4ecca3; font-size: 16px; padding: 8px; font-weight: bold;"

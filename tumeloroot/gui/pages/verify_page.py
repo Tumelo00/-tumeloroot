@@ -37,11 +37,14 @@ class VerifyPage(QWizardPage):
             "5. Download Magisk APK from GitHub:\n"
             "   github.com/topjohnwu/Magisk/releases > Magisk-vXX.X.apk\n"
             "6. Install the Magisk APK on your device\n"
-            "7. Open Magisk > if 'Additional Setup Required' appears,\n"
-            "   select 'Install to Inactive Slot' and let device reboot\n"
-            "8. After reboot, HOLD Power button during orange state again\n"
-            "9. Install 'Root Checker' from Google Play Store and verify\n"
-            "10. Reconnect USB cable to PC for automatic verification below"
+            "7. Open Magisk app and try 'Direct Install' first:\n"
+            "   Magisk > Install > Direct Install (Recommended)\n"
+            "   If Direct Install fails or is not available, use:\n"
+            "   Magisk > Install > Install to Inactive Slot\n"
+            "8. After Magisk finishes, reboot the device\n"
+            "9. HOLD Power button during orange state warning again\n"
+            "10. Install 'Root Checker' from Play Store to verify root\n"
+            "11. Reconnect USB cable to PC for automatic verification below"
         )
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
