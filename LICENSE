@@ -43,3 +43,119 @@ Section 7 of the GNU General Public License version 3:
    trademarks, service marks, or product names of the Licensor, except
    as required for reasonable and customary use in describing the origin
    of the Work and reproducing the content of the attribution notice.
+
+4. CONTRIBUTION AND DERIVATIVE WORKS (Section 7b):
+   The Tumeloroot project provides a complete framework including a BROM
+   bridge, boot image patcher, device profile system, and GUI wizard.
+   If you create derivative works, device profiles, patches, or new
+   features using this framework:
+
+   a) You MUST distribute your derivative work under the same GPLv3
+      license terms, including all additional terms listed here.
+
+   b) You MUST include prominent attribution to the original Tumeloroot
+      project, including a link to the original repository, in your
+      derivative work's documentation, about screen, and source code.
+
+   c) You are STRONGLY ENCOURAGED to contribute device profiles, bug
+      fixes, and improvements back to the upstream Tumeloroot project
+      so the entire community benefits from collective work.
+
+   d) Device profiles (YAML files) created using Tumeloroot's profile
+      format are considered part of the Tumeloroot ecosystem. While
+      the GPLv3 license applies to the software itself, contributors
+      are encouraged to share device profiles with the community.
+
+   e) Distributing closed-source or proprietary software that
+      incorporates Tumeloroot's GPLv3-licensed code is a violation
+      of this license.
+
+5. FREE DISTRIBUTION REQUIREMENT (Section 7c):
+   Tumeloroot is and will always be free software. As an additional
+   condition:
+
+   a) Derivative works MUST be distributed free of charge. You may
+      NOT sell, license for a fee, or otherwise charge money for
+      any software that is based on, derived from, or incorporates
+      Tumeloroot's code, architecture, or device profile format.
+
+   b) You may NOT bundle Tumeloroot or any derivative with paid
+      products, paid subscriptions, premium services, or "freemium"
+      models where core functionality is locked behind a paywall.
+
+   c) You may NOT offer Tumeloroot or any derivative as a paid
+      service (e.g., "pay-per-unlock", "premium rooting service",
+      or similar commercial services).
+
+   d) You may accept voluntary donations for your derivative work,
+      provided the software remains freely available to all users
+      regardless of whether they donate.
+
+   e) This requirement applies to the software itself. It does not
+      restrict charging for unrelated services such as hardware
+      repair, consulting, or technical support, provided the
+      software is still distributed for free.
+
+6. PROHIBITED USES:
+   The following uses of this software are strictly prohibited:
+
+   a) Using this software to bypass FRP or any theft protection
+      on devices the user does not legally own.
+
+   b) Offering paid "FRP unlock", "phone unlocking", or similar
+      commercial services using this software.
+
+   c) Processing devices through a commercial repair/unlock
+      business without verifying the customer's legal ownership.
+
+   d) Modifying or repackaging this software to remove or obscure
+      anti-misuse warnings, ownership checks, or legal disclaimers.
+
+   e) Distributing this software through channels primarily
+      serving device theft (forums, groups, or services dedicated
+      to unlocking stolen phones).
+
+   f) Using this software on devices subject to law enforcement
+      holds, court orders, or active theft investigations.
+
+   Any violation of these prohibited uses constitutes a breach of
+   this license and may result in legal action.
+
+7. INTENDED USE DISCLAIMER:
+   This software is developed and distributed strictly for EDUCATIONAL
+   AND SECURITY RESEARCH PURPOSES ONLY. By using, copying, modifying,
+   or distributing this software, you agree to the following:
+
+   a) LEGAL OWNERSHIP: This software must only be used on devices that
+      the user legally owns or has explicit written authorization from
+      the legal owner to modify. Using this software on stolen, lost,
+      or otherwise unlawfully obtained devices is strictly prohibited.
+
+   b) NOT INTENDED FOR THEFT CIRCUMVENTION: This software includes
+      features such as FRP (Factory Reset Protection) clearing,
+      bootloader unlocking, and related device modification tools.
+      These features are NOT intended to be used for circumventing
+      theft protection mechanisms on devices the user does not own.
+      Any such use constitutes a violation of this license and
+      applicable law.
+
+   c) USER RESPONSIBILITY: Users are solely responsible for ensuring
+      that their use of this software complies with all applicable
+      local, national, and international laws, including but not
+      limited to the Digital Millennium Copyright Act (DMCA), the
+      Computer Fraud and Abuse Act (CFAA), the Turkish Penal Code
+      (TCK Articles 243-245), and equivalent laws in the user's
+      jurisdiction.
+
+   d) NO ENCOURAGEMENT OF ILLEGAL USE: The developers of this software
+      do not encourage, condone, support, or facilitate any illegal
+      use of this software. The software is provided as a research
+      and educational tool, and any misuse is the sole responsibility
+      of the end user.
+
+   e) DISCLAIMER OF LIABILITY FOR MISUSE: The authors, contributors,
+      and copyright holders of this software disclaim all liability
+      for any damages, legal consequences, or losses arising from the
+      misuse of this software, including but not limited to use on
+      devices the user does not legally own, unauthorized access to
+      devices or data, or any violation of applicable laws.

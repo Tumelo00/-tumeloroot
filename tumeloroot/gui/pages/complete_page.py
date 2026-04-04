@@ -24,13 +24,23 @@ class CompletePage(QWizardPage):
 
         self._summary = QLabel(
             "Your device has been successfully rooted!\n\n"
-            "What was done:\n"
-            "  - Bootloader unlocked (seccfg)\n"
-            "  - vbmeta verification disabled\n"
-            "  - Ramdisk patched with Magisk\n"
-            "  - Patched image flashed to both A/B slots\n\n"
-            "Your partition backups are safely stored.\n"
-            "You can now use Magisk modules and root apps."
+            "What was done (single BROM session):\n"
+            "  \u2713 7 partitions backed up safely\n"
+            "  \u2713 Bootloader unlocked (seccfg)\n"
+            "  \u2713 dm-verity disabled (6 vbmeta partitions)\n"
+            "  \u2713 FRP cleared (if selected)\n"
+            "  \u2713 vendor_boot patched with Magisk\n"
+            "  \u2713 Patched image flashed to both A/B slots\n\n"
+            "IMPORTANT REMINDERS:\n"
+            "  - Every reboot: hold Power button during 'orange state' warning\n"
+            "  - Download & install Magisk APK from GitHub if not already done\n"
+            "  - In Magisk app: 'Install to Inactive Slot' if prompted\n"
+            "  - Verify root with 'Root Checker' from Google Play Store\n"
+            "  - After OTA updates, you will need to re-root\n\n"
+            "Your backups are in the TumelorootBackups folder.\n"
+            "Keep backup files safe for emergency restore.\n\n"
+            "DISCLAIMER: The developer accepts no responsibility for any\n"
+            "damage, data loss, or issues resulting from this process."
         )
         self._summary.setWordWrap(True)
         self._summary.setStyleSheet("padding: 16px; background-color: #16213e; border-radius: 8px;")

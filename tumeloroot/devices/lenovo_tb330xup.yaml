@@ -44,8 +44,7 @@ vbmeta:
 brom_instructions:
   steps:
     - "Power off the device completely"
-    - "Hold Power + Vol Up + Vol Down buttons together"
-    - "While holding all 3 buttons, plug in the USB cable"
-    - "Release ONLY the Power button (keep holding Vol Up + Vol Down)"
-    - "Wait 3-5 seconds, then release Vol Up + Vol Down"
-    - "Auto-detection will handle the rest"
+    - "Hold Vol Up + Vol Down buttons together"
+    - "While holding both buttons, plug USB cable into PC"
+    - "Wait 3-5 seconds, then release all buttons"
+    - "App will auto-detect the device"

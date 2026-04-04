@@ -25,7 +25,7 @@ class WelcomePage(QWizardPage):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        subtitle = QLabel("Plug-and-play MediaTek bootloader unlock & root tool")
+        subtitle = QLabel("MediaTek Bootloader Unlock & Root Tool")
         subtitle.setObjectName("subtitle")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(subtitle)
@@ -45,16 +45,17 @@ class WelcomePage(QWizardPage):
 
         # Warning
         warning = QLabel(
-            "WARNING: This tool will unlock the bootloader and root your device.\n"
-            "This may void your warranty and could potentially brick your device.\n"
-            "Ensure you have backed up all important data before proceeding."
+            "WARNING: This tool performs ALL operations in a single BROM session:\n"
+            "backup, bootloader unlock, dm-verity disable, FRP bypass, and Magisk root.\n"
+            "This WILL void your warranty. Back up all important data before proceeding.\n"
+            "FRP bypass is optional (skip Google account after factory reset)."
         )
         warning.setStyleSheet("color: #f0a030; padding: 12px; background-color: #2a2a1e; border-radius: 6px;")
         warning.setWordWrap(True)
         layout.addWidget(warning)
 
         # Acknowledgment
-        self._checkbox = QCheckBox("I understand the risks and want to proceed")
+        self._checkbox = QCheckBox("I am the legal owner of this device and I accept all risks")
         self._checkbox.stateChanged.connect(self.completeChanged)
         layout.addWidget(self._checkbox)
 

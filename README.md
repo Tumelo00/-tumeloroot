@@ -1,93 +1,101 @@
 # Tumeloroot
 
-**Plug-and-play MediaTek device bootloader unlock and root tool.**
+**MediaTek device bootloader unlock and root tool for educational and research purposes.**
 
-Tumeloroot automates the entire process of unlocking the bootloader and rooting MediaTek-based Android devices using mtkclient and Magisk. Just connect your device, select your model, and click through the wizard.
+Tumeloroot automates the entire process of unlocking the bootloader and rooting MediaTek-based Android devices. It uses mtkclient (BROM exploit) and Magisk in a single session - connect your device, select your model, and follow the wizard.
 
 ## Features
 
-- **One-click workflow** - Guided wizard from start to finish
-- **Automatic backup** - Backs up all critical partitions with SHA-256 verification before any changes
-- **Smart ramdisk detection** - Automatically patches the correct partition (boot, init_boot, or vendor_boot)
-- **A/B slot support** - Patches both slots for reliability
-- **Emergency restore** - One-click restore from backup if anything goes wrong
-- **Expandable** - Add new devices by creating simple YAML profile files
-- **Dark themed GUI** - Modern, clean PySide6 interface
+- **Single BROM Session** - Backup, unlock, patch, and flash all in one connection
+- **Automatic Backup** - Backs up all critical partitions before any changes
+- **Magisk Root** - Patches vendor_boot with Magisk using magiskboot via WSL
+- **A/B Slot Support** - Flashes patched image to both slots for reliability
+- **dm-verity Disable** - Patches all vbmeta partitions (flags=3) automatically
+- **FRP Bypass** - Optional Factory Reset Protection clearing
+- **Expandable** - Add new devices with simple YAML profile files
+- **Dark Themed GUI** - Modern PySide6 wizard interface with real-time progress
 
-## Supported Devices
+## Verified Devices
 
 | Device | Codename | Chipset | Android | Ramdisk In | Status |
 |--------|----------|---------|---------|------------|--------|
-| Lenovo Tab K11 | TB330XUP | MT6768/MT6769 | 15 | vendor_boot | Verified |
+| Lenovo Tab K11 | TB330XUP | MT6768/MT6769 (Helio P65/G85) | 15 | vendor_boot | Verified |
+
+## Requirements
+
+- Windows 10/11 with WSL (Windows Subsystem for Linux) installed
+- Python 3.9+ (for running from source)
+- USB cable (data transfer capable)
+- [mtkclient](https://github.com/bkerler/mtkclient) installed and accessible
+- UsbDk driver (for USB communication)
+- [Magisk APK](https://github.com/topjohnwu/Magisk/releases) in Downloads folder or assets/magisk/
+- ADB (Android Debug Bridge) for root verification
+
+## How It Works
+
+Everything happens in a **single BROM connection**:
+
+1. **Device enters BROM mode** - Power off > Hold Vol Up + Vol Down > Plug USB
+2. **Backup** - Reads 7 critical partitions (seccfg, boot_a/b, vendor_boot_a/b, vbmeta_a/b)
+3. **Unlock** - Modifies seccfg to unlock the bootloader
+4. **dm-verity** - Patches all 6 vbmeta partitions with flags=3
+5. **FRP** - Optionally clears Factory Reset Protection
+6. **Read** - Dumps vendor_boot_a (64 MB) from device
+7. **Magisk Patch** - Uses magiskboot (extracted from Magisk APK) via WSL to patch the image
+8. **Flash** - Writes patched vendor_boot to both A and B slots
+
+After reboot, install the Magisk app and select "Install to inactive slot" if prompted.
 
 ## Installation
 
-### From Source
+### Pre-built EXE
+Download `Tumeloroot.exe` from the releases page and run it directly.
 
+### From Source
 ```bash
 git clone https://github.com/Tumelo00/-tumeloroot.git
 cd tumeloroot
 pip install -e .
-```
-
-### Run
-
-```bash
 python -m tumeloroot
 ```
 
-Or after pip install:
-
-```bash
-tumeloroot
-```
-
-## Requirements
-
-- Python 3.9+
-- Windows 10/11 (Linux support planned)
-- USB cable
-- [mtkclient](https://github.com/bkerler/mtkclient) (auto-detected)
-- UsbDk driver (Windows)
-- ADB (Android Debug Bridge)
-
-## How It Works
-
-1. **Prerequisites** - Checks and installs all required tools
-2. **Connect** - Guides you to enter BROM mode and connects via mtkclient
-3. **Backup** - Backs up seccfg, boot, vendor_boot, and vbmeta partitions
-4. **Unlock** - Unlocks the bootloader via seccfg modification
-5. **Patch & Flash** - Disables vbmeta verification, patches ramdisk with Magisk, flashes to both slots
-6. **Verify** - Confirms root access via ADB
-
 ## Adding New Device Support
 
-1. Copy `tumeloroot/devices/_template.yaml` to a new file (e.g., `my_device.yaml`)
-2. Fill in your device's specifications (chipset hwcode, partition layout, ramdisk location)
-3. The most critical field is `ramdisk_partition` - this determines which partition Magisk patches
-4. Submit a pull request to share with the community!
+1. Copy `tumeloroot/devices/_template.yaml` to a new file
+2. Fill in your device specifications
+3. The critical field is `ramdisk_partition` - determines which partition Magisk patches
+4. Test with your device and submit a pull request
 
 ### Finding Your Ramdisk Partition
-
-The ramdisk can be in `boot`, `init_boot`, or `vendor_boot`. To determine which:
-
 ```bash
-# Check each image with magiskboot:
-magiskboot unpack boot.img        # Look for RAMDISK_SZ > 0
-magiskboot unpack init_boot.img   # Look for RAMDISK_SZ > 0
-magiskboot unpack vendor_boot.img # Look for RAMDISK_SZ > 0 (check header: VNDRBOOT)
+# Use magiskboot to check each image:
+magiskboot unpack boot.img         # Standard boot ramdisk
+magiskboot unpack init_boot.img    # GKI 2.0 devices
+magiskboot unpack vendor_boot.img  # Vendor boot (like Lenovo Tab K11)
 ```
+The one with `RAMDISK_SZ > 0` is your target.
+
+## Contributing
+
+Tumeloroot is built on open-source tools and we believe in giving back. If you use our framework to add support for new devices or develop improvements:
+
+- **Submit your device profiles** back to the project so everyone benefits
+- **Bug fixes and features** should be contributed upstream under GPLv3
+- **Derivative works** must attribute Tumeloroot and use the same GPLv3 license
+- **Don't fragment** — keep improvements under one roof so the community grows together
+
+See [LICENSE](LICENSE) for full contribution and derivative work terms.
 
 ## License
 
-GPLv3 with name protection. You can modify and redistribute this software, but modified versions **must not** use the name "Tumeloroot". See [LICENSE](LICENSE) for details.
+GPLv3 with name protection and contribution terms. Modified versions must use a different name and attribute Tumeloroot. See [LICENSE](LICENSE).
 
 ## Credits
 
-- [mtkclient](https://github.com/bkerler/mtkclient) by bkerler - MediaTek flash and exploit tool
-- [Magisk](https://github.com/topjohnwu/Magisk) by topjohnwu - The magic mask for Android
-- XDA Developers community - For research and device-specific knowledge
+- [mtkclient](https://github.com/bkerler/mtkclient) by bkerler
+- [Magisk](https://github.com/topjohnwu/Magisk) by topjohnwu
+- XDA Developers community
 
 ## Disclaimer
 
-This tool is provided for educational and research purposes. Unlocking the bootloader and rooting your device may void your warranty and could potentially brick your device. Use at your own risk. Always ensure you have a backup before proceeding.
+This software is provided **strictly for educational and security research purposes**. It must only be used on devices you legally own. The FRP clearing feature is intended for device owners who have forgotten their credentials, not for circumventing theft protection on stolen devices. Misuse may violate local and international laws. The developers assume no liability for any misuse, damage, or legal consequences. Use at your own risk.

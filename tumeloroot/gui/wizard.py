@@ -10,9 +10,6 @@ from tumeloroot.gui.widgets.device_animation import StepIndicator
 from tumeloroot.gui.pages.welcome_page import WelcomePage
 from tumeloroot.gui.pages.oem_unlock_page import OemUnlockPage
 from tumeloroot.gui.pages.prerequisites_page import PrerequisitesPage
-from tumeloroot.gui.pages.connect_page import ConnectPage
-from tumeloroot.gui.pages.backup_page import BackupPage
-from tumeloroot.gui.pages.unlock_page import UnlockPage
 from tumeloroot.gui.pages.patch_page import PatchPage
 from tumeloroot.gui.pages.verify_page import VerifyPage
 from tumeloroot.gui.pages.complete_page import CompletePage
@@ -29,16 +26,13 @@ class RootWizard(QWizard):
         self.setOption(QWizard.WizardOption.NoBackButtonOnStartPage, True)
         self.setOption(QWizard.WizardOption.NoCancelButton, True)
 
-        # Step indicator at top (updated for 9 steps)
+        # Step indicator at top (6 steps)
         self._step_indicator = StepIndicator()
         self._step_indicator.STEPS = [
             ("Select", "device"),
             ("OEM", "unlock"),
             ("Check", "prereqs"),
-            ("Connect", "BROM"),
-            ("Backup", "partitions"),
-            ("Unlock", "bootloader"),
-            ("Patch", "& flash"),
+            ("Unlock", "& root"),
             ("Verify", "root"),
             ("Done", "!"),
         ]
@@ -48,14 +42,11 @@ class RootWizard(QWizard):
         self._log.setFixedHeight(110)
         self._engine = None
 
-        # Create pages in correct order
+        # Create pages in correct order (6 steps)
         self._welcome = WelcomePage()
         self._oem_unlock = OemUnlockPage()
         self._prereqs = PrerequisitesPage()
-        self._connect = ConnectPage()
-        self._backup = BackupPage()
-        self._unlock = UnlockPage()
-        self._patch = PatchPage()
+        self._patch = PatchPage()          # ALL-IN-ONE: backup + unlock + root
         self._verify = VerifyPage()
         self._complete = CompletePage()
 
@@ -64,9 +55,6 @@ class RootWizard(QWizard):
             self._welcome,
             self._oem_unlock,
             self._prereqs,
-            self._connect,
-            self._backup,
-            self._unlock,
             self._patch,
             self._verify,
             self._complete,
@@ -137,9 +125,6 @@ class RootWizard(QWizard):
         self._engine = RootEngine(profile, progress_cb, log_cb)
         self._log.append_log(f"Device selected: {profile.display_name}", "INFO")
 
-        self._connect.set_engine(self._engine)
-        self._backup.set_engine(self._engine)
-        self._unlock.set_engine(self._engine)
         self._patch.set_engine(self._engine)
         self._verify.set_engine(self._engine)
         self._complete.set_engine(self._engine)

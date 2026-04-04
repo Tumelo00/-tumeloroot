@@ -26,15 +26,53 @@ class VerifyPage(QWizardPage):
 
         layout = QVBoxLayout(self)
 
-        layout.addWidget(QLabel(
-            "Boot the device normally:\n"
-            "1. Disconnect USB cable\n"
-            "2. Power on the device\n"
-            "3. Wait for Android to fully boot\n"
-            "4. Reconnect USB cable\n"
-            "5. Press 'Check Root' below"
-        ))
-        layout.addSpacing(20)
+        instructions = QLabel(
+            "After the rooting process completes, follow these steps carefully:\n\n"
+            "1. Unplug USB cable from the device\n"
+            "2. Long-press Power button to turn on the device\n"
+            "3. IMPORTANT: An 'orange state' warning will appear at boot\n"
+            "   HOLD the Power button until the warning disappears!\n"
+            "   If you don't hold Power, the device may get stuck.\n"
+            "4. Wait for Android to fully boot to the home screen\n"
+            "5. Download Magisk APK from GitHub:\n"
+            "   github.com/topjohnwu/Magisk/releases > Magisk-vXX.X.apk\n"
+            "6. Install the Magisk APK on your device\n"
+            "7. Open Magisk > if 'Additional Setup Required' appears,\n"
+            "   select 'Install to Inactive Slot' and let device reboot\n"
+            "8. After reboot, HOLD Power button during orange state again\n"
+            "9. Install 'Root Checker' from Google Play Store and verify\n"
+            "10. Reconnect USB cable to PC for automatic verification below"
+        )
+        instructions.setWordWrap(True)
+        layout.addWidget(instructions)
+        layout.addSpacing(6)
+
+        orange_warning = QLabel(
+            "CRITICAL: Every time you restart the device, an 'orange state'\n"
+            "warning will appear. You MUST hold the Power button until\n"
+            "the warning disappears. This is normal for unlocked bootloaders.\n"
+            "Failing to hold Power may cause a boot delay or partial bootloop."
+        )
+        orange_warning.setWordWrap(True)
+        orange_warning.setStyleSheet(
+            "color: #e94560; padding: 10px; background-color: #2a1a1e; "
+            "border-radius: 6px; font-weight: bold; font-size: 12px;"
+        )
+        layout.addWidget(orange_warning)
+        layout.addSpacing(6)
+
+        disclaimer_note = QLabel(
+            "Note: Any issues arising from the rooting process, including boot\n"
+            "problems, data loss, or device malfunction, are the sole responsibility\n"
+            "of the user. The developers accept no liability. Use at your own risk."
+        )
+        disclaimer_note.setWordWrap(True)
+        disclaimer_note.setStyleSheet(
+            "color: #a0a0b0; padding: 8px; background-color: #16213e; "
+            "border-radius: 6px; font-size: 11px; font-style: italic;"
+        )
+        layout.addWidget(disclaimer_note)
+        layout.addSpacing(6)
 
         self._check_btn = QPushButton("Check Root")
         self._check_btn.clicked.connect(self._check)

@@ -2,6 +2,7 @@
 
 from PySide6.QtWidgets import (
     QWizardPage, QVBoxLayout, QLabel, QPushButton, QMessageBox, QGroupBox,
+    QCheckBox,
 )
 from PySide6.QtCore import Qt, QThread, Signal
 
@@ -10,15 +11,16 @@ class UnlockWorker(QThread):
     finished = Signal(bool)
     log = Signal(str, str)
 
-    def __init__(self, engine):
+    def __init__(self, engine, clear_frp: bool = False):
         super().__init__()
         self._engine = engine
+        self._clear_frp = clear_frp
         self._orig_log_cb = engine._log_cb
 
     def run(self):
         self._engine._log_cb = lambda msg, lvl: self.log.emit(msg, lvl)
         try:
-            self.finished.emit(self._engine.run_step("unlock"))
+            self.finished.emit(self._engine.run_step("unlock", clear_frp=self._clear_frp))
         finally:
             self._engine._log_cb = self._orig_log_cb
 
@@ -37,11 +39,15 @@ class UnlockPage(QWizardPage):
         explain_layout = QVBoxLayout()
         explain = QLabel(
             "The bootloader is the first program that runs when your device turns on.\n"
-            "By default, it is LOCKED — meaning it only boots official Lenovo software.\n\n"
+            "By default, it is LOCKED - meaning it only boots official software.\n\n"
             "To install Magisk (root), we need to UNLOCK it.\n"
             "This is done by modifying the 'seccfg' (security config) partition.\n\n"
+            "This step will:\n"
+            "  1. Unlock seccfg (bootloader unlock)\n"
+            "  2. Patch all vbmeta partitions (disable dm-verity)\n"
+            "  3. Optionally clear FRP (skip Google account after reset)\n\n"
             "After unlock, your device will show an 'Orange State' warning at boot.\n"
-            "This is NORMAL and means the bootloader is unlocked."
+            "This is NORMAL. Hold Power button for 5-10 seconds to boot past it."
         )
         explain.setWordWrap(True)
         explain.setStyleSheet("color: #c0c0d0; padding: 8px; line-height: 1.4;")
@@ -49,11 +55,35 @@ class UnlockPage(QWizardPage):
         explain_group.setLayout(explain_layout)
         layout.addWidget(explain_group)
 
+        # dm-verity warning
+        dmv_group = QGroupBox("Important: After Unlock")
+        dmv_layout = QVBoxLayout()
+        dmv_label = QLabel(
+            "After bootloader unlock, your device may show a dm-verity / corruption warning.\n"
+            "This is EXPECTED and NORMAL — your device will still boot fine!\n\n"
+            "To boot past this screen:\n"
+            "  - Press and HOLD the Power button until the warning disappears\n"
+            "  - The device will then continue booting normally\n"
+            "  - You may need to hold Power longer than usual (5-10 seconds)\n\n"
+            "This warning will appear every time you boot — it is cosmetic and harmless."
+        )
+        dmv_label.setWordWrap(True)
+        dmv_label.setStyleSheet(
+            "color: #7ec8e3; padding: 8px; line-height: 1.4;"
+        )
+        dmv_layout.addWidget(dmv_label)
+        dmv_group.setLayout(dmv_layout)
+        dmv_group.setStyleSheet(
+            "QGroupBox { border: 1px solid #3a6080; border-radius: 6px; margin-top: 6px; padding-top: 14px; }"
+            "QGroupBox::title { color: #7ec8e3; }"
+        )
+        layout.addWidget(dmv_group)
+
         layout.addSpacing(8)
 
         # Warning
         warning = QLabel(
-            "WARNING: Unlocking MAY erase all data on the device (factory reset).\n"
+            "WARNING: Unlocking MAY trigger a factory reset on some devices.\n"
             "Your backup from the previous step will protect you if something goes wrong."
         )
         warning.setStyleSheet(
@@ -63,7 +93,18 @@ class UnlockPage(QWizardPage):
         warning.setWordWrap(True)
         layout.addWidget(warning)
 
-        layout.addSpacing(12)
+        layout.addSpacing(8)
+
+        # FRP checkbox
+        self._frp_checkbox = QCheckBox("Clear FRP (skip Google account setup after factory reset)")
+        self._frp_checkbox.setChecked(True)
+        self._frp_checkbox.setStyleSheet(
+            "QCheckBox { color: #c0c0d0; font-size: 12px; padding: 6px 4px; }"
+            "QCheckBox::indicator { width: 18px; height: 18px; }"
+        )
+        layout.addWidget(self._frp_checkbox)
+
+        layout.addSpacing(8)
 
         # Status
         self._status = QLabel("Ready to unlock. Click the button below to proceed.")
@@ -109,7 +150,8 @@ class UnlockPage(QWizardPage):
         self._status.setStyleSheet("color: #f0a030; font-size: 13px; padding: 8px; font-weight: bold;")
         self._result.setText("")
 
-        self._worker = UnlockWorker(self._engine)
+        clear_frp = self._frp_checkbox.isChecked()
+        self._worker = UnlockWorker(self._engine, clear_frp=clear_frp)
         self._worker.log.connect(self._on_log)
         self._worker.finished.connect(self._on_done)
         self._worker.start()
@@ -123,7 +165,12 @@ class UnlockPage(QWizardPage):
         self._done = success
         self._unlock_btn.setEnabled(True)
         if success:
-            self._status.setText("")
+            self._status.setText(
+                "dm-verity warning at boot is NORMAL. Hold Power button to boot past it."
+            )
+            self._status.setStyleSheet(
+                "color: #7ec8e3; font-size: 12px; padding: 8px; font-style: italic;"
+            )
             self._result.setText("BOOTLOADER UNLOCKED!")
             self._result.setStyleSheet(
                 "color: #4ecca3; font-size: 22px; font-weight: bold; padding: 16px;"

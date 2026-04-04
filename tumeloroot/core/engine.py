@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
-from enum import Enum
+import tempfile
+from pathlib import Path
 from typing import Callable, Optional
 
 from tumeloroot.core.adb_bridge import AdbBridge
@@ -18,105 +19,62 @@ from tumeloroot.core.platform_utils import get_default_backup_dir
 
 logger = logging.getLogger(__name__)
 
-ProgressCallback = Callable[[int, int, str], None]
 LogCallback = Callable[[str, str], None]
 
 
-class RootStep(Enum):
-    PREREQUISITES = "prerequisites"
-    CONNECT = "connect"
-    BACKUP = "backup"
-    UNLOCK = "unlock"
-    PATCH_VBMETA = "patch_vbmeta"
-    PATCH_MAGISK = "patch_magisk"
-    FLASH = "flash"
-    VERIFY = "verify"
-
-
-class StepState(Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    SUCCESS = "success"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-
-
 class RootEngine:
-    """Main orchestrator - coordinates all rooting steps.
-
-    Usage:
-        profile = DeviceProfile.load("devices/lenovo_tb330xup.yaml")
-        engine = RootEngine(profile, progress_cb, log_cb)
-        engine.run_step("prerequisites")
-        engine.run_step("connect")
-        engine.run_step("backup")
-        ...
-    """
+    """Main orchestrator for all rooting steps."""
 
     def __init__(
         self,
         device_profile: DeviceProfile,
-        progress_callback: Optional[ProgressCallback] = None,
+        progress_callback=None,
         log_callback: Optional[LogCallback] = None,
     ):
         self.profile = device_profile
         self._progress_cb = progress_callback
         self._log_cb = log_callback
 
-        # Validate profile
         errors = device_profile.validate()
         if errors:
             for err in errors:
                 logger.warning(f"Profile issue: {err}")
 
-        self._states: dict[RootStep, StepState] = {s: StepState.PENDING for s in RootStep}
         self._backup_dir: Optional[str] = None
+        self._stock_image_path: Optional[str] = None
         self._patched_image_path: Optional[str] = None
 
-        self._mtk = MtkBridge(progress_callback=progress_callback, log_callback=log_callback)
+        self._mtk = MtkBridge(log_callback=log_callback)
         self._adb = AdbBridge()
         self._checker = PrerequisiteChecker()
-        self._backup_mgr: Optional[BackupManager] = None
-        self._magisk: Optional[MagiskPatcher] = None
 
     def _log(self, msg: str, level: str = "INFO") -> None:
         logger.log(getattr(logging, level, logging.INFO), msg)
         if self._log_cb:
             self._log_cb(msg, level)
 
-    def _progress(self, current: int, total: int, msg: str = "") -> None:
-        if self._progress_cb:
-            self._progress_cb(current, total, msg)
-
-    def get_state(self) -> dict[str, str]:
-        return {step.value: state.value for step, state in self._states.items()}
-
-    def run_step(self, step_name: str) -> bool:
-        """Run a single step by name."""
-        step = RootStep(step_name)
-        self._states[step] = StepState.RUNNING
-        self._log(f"Starting step: {step.value}")
-
+    def run_step(self, step_name: str, **kwargs) -> bool:
+        self._log(f"Starting step: {step_name}")
         handlers = {
-            RootStep.PREREQUISITES: self._run_prerequisites,
-            RootStep.CONNECT: self._run_connect,
-            RootStep.BACKUP: self._run_backup,
-            RootStep.UNLOCK: self._run_unlock,
-            RootStep.PATCH_VBMETA: self._run_patch_vbmeta,
-            RootStep.PATCH_MAGISK: self._run_patch_magisk,
-            RootStep.FLASH: self._run_flash,
-            RootStep.VERIFY: self._run_verify,
+            "prerequisites": self._run_prerequisites,
+            "connect": self._run_connect,
+            "backup": self._run_backup,
+            "unlock": self._run_unlock,
+            "read_stock": self._run_read_stock,
+            "patch_magisk": self._run_patch_magisk,
+            "flash": self._run_flash,
+            "root_all": self._run_root_all,
+            "unlock_and_root": self._run_unlock_and_root,
+            "verify": self._run_verify,
         }
-
+        handler = handlers.get(step_name)
+        if not handler:
+            self._log(f"Unknown step: {step_name}", "ERROR")
+            return False
         try:
-            success = handlers[step]()
-            self._states[step] = StepState.SUCCESS if success else StepState.FAILED
-            status = "completed" if success else "FAILED"
-            self._log(f"Step {step.value}: {status}", "SUCCESS" if success else "ERROR")
-            return success
+            return handler(**kwargs)
         except Exception as e:
-            self._states[step] = StepState.FAILED
-            self._log(f"Step {step.value} error: {e}", "ERROR")
+            self._log(f"Step {step_name} error: {e}", "ERROR")
             return False
 
     def _run_prerequisites(self) -> bool:
@@ -130,149 +88,284 @@ class RootEngine:
         return all_ok
 
     def _run_connect(self) -> bool:
-        self._log("Connecting to device in BROM mode...")
-        return self._mtk.connect_brom()
+        """Test connection by reading GPT."""
+        self._log("Testing BROM connection...")
+        ok, output = self._mtk.print_gpt()
+        return ok
 
     def _run_backup(self) -> bool:
         backup_dir = get_default_backup_dir()
-        self._backup_mgr = BackupManager(backup_dir, self._mtk)
-
+        mgr = BackupManager(backup_dir, self._mtk)
         partitions = self.profile.partitions.backup_list
         self._log(f"Backing up {len(partitions)} partitions...")
-
-        def on_progress(name, current, total):
-            self._progress(current, total, f"Backing up {name}")
-            self._log(f"  [{current + 1}/{total}] {name}")
-
-        result = self._backup_mgr.create_backup(partitions, on_progress)
+        result = mgr.create_backup(
+            partitions,
+            progress_callback=lambda name, i, t: self._log(f"  [{i+1}/{t}] Backing up {name}")
+        )
         if result:
             self._backup_dir = result
-            self._log(f"Backup saved to: {result}")
-
-            valid, errors = self._backup_mgr.verify_backup(result)
-            if valid:
-                self._log("Backup verification: OK")
-            else:
-                self._log(f"Backup verification failed: {errors}", "WARNING")
+            self._log(f"Backup saved to: {result}", "SUCCESS")
             return True
         return False
 
-    def _run_unlock(self) -> bool:
-        self._log("Unlocking bootloader via seccfg...")
-        return self._mtk.unlock_bootloader()
+    def _run_unlock(self, clear_frp: bool = False) -> bool:
+        """Unlock bootloader — runs mtkclient in CMD window."""
+        return self._mtk.unlock_bootloader(clear_frp=clear_frp)
 
-    def _run_patch_vbmeta(self) -> bool:
-        self._log("Patching vbmeta partitions to disable verification...")
-        offset = self.profile.vbmeta.flags_offset
-        flags = self.profile.vbmeta.flags_value
+    # ── Root: Read stock + Magisk patch + Flash ────────────────
 
-        for vbmeta_name in self.profile.vbmeta.partitions:
-            self._log(f"  Reading {vbmeta_name}...")
-            data = self._mtk.read_partition(vbmeta_name)
-            if data is None:
-                self._log(f"  Failed to read {vbmeta_name}", "ERROR")
-                return False
+    def _run_read_stock(self) -> bool:
+        """Read vendor_boot from device via BROM.
 
-            patched = patch_vbmeta(data, flags=flags, offset=offset)
-            if not verify_patch(patched, flags, offset):
-                self._log(f"  Patch verification failed for {vbmeta_name}", "ERROR")
-                return False
+        Opens a CMD window, connects BROM, reads the partition, saves to PC.
+        This guarantees we have the EXACT image currently on the device.
+        """
+        target = self.profile.partitions.root_target  # "vendor_boot"
+        slot = f"{target}_a"                          # "vendor_boot_a"
 
-            self._log(f"  Writing patched {vbmeta_name}...")
-            if not self._mtk.write_partition(vbmeta_name, patched):
-                self._log(f"  Failed to write {vbmeta_name}", "ERROR")
-                return False
+        self._log(f"=== READ {slot} FROM DEVICE ===", "INFO")
 
-            self._log(f"  {vbmeta_name}: OK")
+        # Save to temp dir so it works regardless of backup state
+        output_path = os.path.join(
+            tempfile.gettempdir(), f"tumeloroot_stock_{slot}.img"
+        )
 
-        self._log("All vbmeta partitions patched")
-        return True
+        # Clean old file if exists
+        if os.path.isfile(output_path):
+            os.remove(output_path)
+
+        ok = self._mtk.read_stock_image(slot, output_path)
+        if ok and os.path.isfile(output_path):
+            size_mb = os.path.getsize(output_path) / (1024 * 1024)
+            self._stock_image_path = output_path
+            self._log(f"Stock {slot}: {size_mb:.1f} MB saved to {output_path}", "SUCCESS")
+            return True
+
+        self._log(f"Failed to read {slot} from device!", "ERROR")
+        return False
 
     def _run_patch_magisk(self) -> bool:
-        self._log("Patching image with Magisk...")
-        self._log("Device needs to be booted to Android for this step")
-        self._log("Waiting for ADB connection...")
+        """Patch vendor_boot with Magisk via ADB.
 
-        if not self._adb.wait_for_device(timeout=180):
-            self._log("Device not found via ADB", "ERROR")
+        Flow:
+          1. Wait for device on ADB (user boots to Android)
+          2. Use the stock image read from device in previous step
+          3. Install Magisk APK on device
+          4. Push vendor_boot, patch with Magisk, pull back patched image
+        """
+        self._log("=== MAGISK PATCH ===", "INFO")
+
+        # Use stock image from read_stock step
+        if not self._stock_image_path or not os.path.isfile(self._stock_image_path):
+            self._log("Stock image not found! Run 'Read from device' step first.", "ERROR")
             return False
 
-        self._magisk = MagiskPatcher(self._adb)
-        target = self.profile.partitions.root_target
-        target_a = f"{target}_a" if self.profile.boot_structure.ab_device else target
+        size_mb = os.path.getsize(self._stock_image_path) / (1024 * 1024)
+        self._log(f"Stock image: {self._stock_image_path} ({size_mb:.1f} MB)")
 
-        # Read the target partition image from backup
-        if self._backup_dir:
-            img_path = os.path.join(self._backup_dir, f"{target_a}.img")
-            if os.path.isfile(img_path):
-                output = os.path.join(self._backup_dir, f"{target}_patched.img")
-                success = self._magisk.patch_image_via_adb(
-                    img_path, output, log_callback=lambda m: self._log(f"  {m}")
-                )
-                if success:
-                    self._patched_image_path = output
-                    self._log(f"Patched image saved: {output}")
-                return success
+        # Wait for ADB device
+        self._log("Waiting for device on ADB...", "WARNING")
+        self._log("Boot your device to Android, connect USB, allow USB debugging.", "WARNING")
 
-        self._log("No backup image found for patching", "ERROR")
+        if not self._adb.wait_for_device(timeout=300):
+            self._log("Device not found on ADB after 5 minutes!", "ERROR")
+            self._log("Make sure device is booted, USB connected, debugging enabled.", "ERROR")
+            return False
+
+        self._log("Device found on ADB!", "SUCCESS")
+
+        # Output path for patched image (next to stock)
+        out_dir = os.path.dirname(self._stock_image_path)
+        patched_path = os.path.join(out_dir, "tumeloroot_magisk_patched.img")
+
+        # Patch via Magisk
+        patcher = MagiskPatcher(self._adb)
+        success = patcher.patch_image_via_adb(
+            self._stock_image_path,
+            patched_path,
+            log_callback=lambda msg: self._log(msg),
+        )
+
+        if success and os.path.isfile(patched_path):
+            patched_mb = os.path.getsize(patched_path) / (1024 * 1024)
+            self._patched_image_path = patched_path
+            self._log(f"Patched image: {patched_path} ({patched_mb:.1f} MB)", "SUCCESS")
+            self._log("=== MAGISK PATCH COMPLETE ===", "SUCCESS")
+            return True
+
+        self._log("Magisk patching failed!", "ERROR")
         return False
 
     def _run_flash(self) -> bool:
+        """Flash patched vendor_boot + disable vbmeta via BROM.
+
+        Single BROM connection:
+          1. Flash patched vendor_boot to both A/B slots
+          2. Patch all vbmeta partitions (flags=3)
+        """
         if not self._patched_image_path or not os.path.isfile(self._patched_image_path):
-            self._log("No patched image available", "ERROR")
+            self._log("No patched image found! Run Magisk patch first.", "ERROR")
             return False
 
-        self._log("Flashing patched image to device...")
-        self._log("Device needs to be in BROM mode for this step")
-
-        if not self._mtk.is_connected:
-            self._log("Reconnecting to BROM...")
-            if not self._mtk.connect_brom():
-                return False
-
-        with open(self._patched_image_path, "rb") as f:
-            patched_data = f.read()
+        self._log("=== FLASH + VBMETA ===", "INFO")
         flash_targets = self.profile.partitions.flash_targets
+        vbmeta_parts = self.profile.vbmeta.partitions
+        self._log(f"Flash targets: {', '.join(flash_targets)}")
+        self._log(f"Vbmeta targets: {', '.join(vbmeta_parts)}")
 
-        for target in flash_targets:
-            self._log(f"  Flashing {target} ({len(patched_data) // 1024 // 1024}MB)...")
-            if not self._mtk.write_partition(target, patched_data):
-                self._log(f"  Failed to flash {target}", "ERROR")
-                return False
-            self._log(f"  {target}: OK")
+        return self._mtk.flash_root(
+            self._patched_image_path,
+            flash_targets,
+            vbmeta_parts,
+        )
 
-        self._log("Flash completed successfully!")
-        return True
+    # ── Root ALL-IN-ONE: single BROM session ──────────────────
+
+    def _run_root_all(self) -> bool:
+        """Single BROM session: read vendor_boot, Magisk patch on PC, flash back.
+
+        Flow:
+          1. BROM script reads vendor_boot_a from device
+          2. PC patches with Magisk (boot_patcher.py - pure Python)
+          3. BROM script flashes patched image to both A/B slots
+          4. BROM script verifies vbmeta flags=3
+        """
+        self._log("=== ROOT ALL-IN-ONE ===", "INFO")
+
+        target = self.profile.partitions.root_target  # "vendor_boot"
+        slot = f"{target}_a"
+        flash_targets = self.profile.partitions.flash_targets
+        vbmeta_parts = self.profile.vbmeta.partitions
+
+        # Find Magisk APK
+        magisk_apk = self._find_magisk_apk()
+        if not magisk_apk:
+            self._log("Magisk APK not found!", "ERROR")
+            self._log("Please download Magisk APK to Downloads folder.", "ERROR")
+            return False
+        self._log(f"Magisk APK: {magisk_apk}", "INFO")
+
+        def _patch_callback(stock_path: str, patched_path: str) -> bool:
+            """Called by mtk_bridge when stock image is ready."""
+            from tumeloroot.core.boot_patcher import patch_boot_image
+            self._log("Starting PC-side Magisk patch...", "INFO")
+            return patch_boot_image(
+                image_path=stock_path,
+                output_path=patched_path,
+                magisk_apk=magisk_apk,
+                log_cb=lambda msg: self._log(msg),
+            )
+
+        return self._mtk.root_and_flash(
+            partition=slot,
+            flash_targets=flash_targets,
+            vbmeta_parts=vbmeta_parts,
+            patch_callback=_patch_callback,
+        )
+
+    # ── Unlock + Root ALL-IN-ONE: single BROM session ─────────
+
+    def _run_unlock_and_root(self, clear_frp: bool = False) -> bool:
+        """Single BROM session: backup + unlock + root - EVERYTHING.
+
+        Flow (one BROM connection):
+          0. Backup critical partitions
+          1. seccfg unlock (bootloader)
+          2. vbmeta flags=3 (disable dm-verity)
+          3. FRP clear (optional)
+          4. Read vendor_boot_a from device
+          5. PC patches with Magisk (magiskboot via WSL)
+          6. Flash patched image to both A/B slots
+        """
+        self._log("=== ALL-IN-ONE (Single BROM Session) ===", "INFO")
+
+        target = self.profile.partitions.root_target
+        slot = f"{target}_a"
+        flash_targets = self.profile.partitions.flash_targets
+        vbmeta_parts = self.profile.vbmeta.partitions
+
+        # Backup partitions
+        backup_list = self.profile.partitions.backup_list
+        backup_dir = None
+        if backup_list:
+            import time
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            backup_dir = os.path.join(get_default_backup_dir(), f"backup_{timestamp}")
+            self._log(f"Will backup {len(backup_list)} partitions to: {backup_dir}", "INFO")
+            self._backup_dir = backup_dir
+
+        # Find Magisk APK
+        magisk_apk = self._find_magisk_apk()
+        if not magisk_apk:
+            self._log("Magisk APK not found!", "ERROR")
+            self._log("Please download Magisk APK to Downloads folder.", "ERROR")
+            return False
+        self._log(f"Magisk APK: {magisk_apk}", "INFO")
+
+        def _patch_callback(stock_path: str, patched_path: str) -> bool:
+            """Called by mtk_bridge when stock image is ready."""
+            from tumeloroot.core.boot_patcher import patch_boot_image
+            self._log("Starting PC-side Magisk patch (magiskboot via WSL)...", "INFO")
+
+            # Progress file so CMD window shows what's happening
+            progress_file = self._mtk._root_progress_file()
+
+            def _log_with_progress(msg):
+                self._log(msg)
+                # Append to progress file for CMD window
+                try:
+                    with open(progress_file, 'a', encoding='utf-8', errors='replace') as pf:
+                        pf.write(msg + '\n')
+                except Exception:
+                    pass
+
+            return patch_boot_image(
+                image_path=stock_path,
+                output_path=patched_path,
+                magisk_apk=magisk_apk,
+                log_cb=_log_with_progress,
+            )
+
+        return self._mtk.unlock_and_root(
+            partition=slot,
+            flash_targets=flash_targets,
+            vbmeta_parts=vbmeta_parts,
+            clear_frp=clear_frp,
+            patch_callback=_patch_callback,
+            backup_partitions=backup_list,
+            backup_dir=backup_dir,
+        )
+
+    def _find_magisk_apk(self) -> Optional[str]:
+        """Find Magisk APK on PC."""
+        from pathlib import Path
+        # Check assets dir
+        assets = Path(os.path.dirname(__file__)).parent / "assets" / "magisk"
+        if assets.is_dir():
+            apks = sorted(assets.glob("Magisk*.apk"), reverse=True)
+            if apks:
+                return str(apks[0])
+        # Check Downloads
+        downloads = Path.home() / "Downloads"
+        if downloads.is_dir():
+            apks = sorted(downloads.glob("Magisk*.apk"), reverse=True)
+            if apks:
+                return str(apks[0])
+        return None
+
+    # ── Verify ───────────────────────────────────────────────────
 
     def _run_verify(self) -> bool:
-        self._log("Verifying root access...")
-        self._log("Waiting for device to boot...")
-
-        if not self._adb.wait_for_device(timeout=180):
+        self._log("Checking root access via ADB...")
+        if not self._adb.wait_for_device(timeout=120):
             self._log("Device not found via ADB", "ERROR")
             return False
-
         if self._adb.check_root():
-            magisk_ver = self._adb.get_magisk_version()
-            self._log(f"ROOT VERIFIED! Magisk version: {magisk_ver}", "SUCCESS")
+            ver = self._adb.get_magisk_version()
+            self._log(f"ROOT VERIFIED! Magisk: {ver}", "SUCCESS")
             return True
-
-        self._log("Root verification failed - su not available", "ERROR")
+        self._log("Root not detected", "ERROR")
         return False
 
-    def emergency_restore(self) -> bool:
-        """Restore all partitions from backup (emergency recovery)."""
-        if not self._backup_dir or not self._backup_mgr:
-            self._log("No backup available for restore", "ERROR")
-            return False
-
-        self._log("EMERGENCY RESTORE: Restoring all partitions...")
-        if not self._mtk.is_connected:
-            if not self._mtk.connect_brom():
-                self._log("Cannot connect to device for restore", "ERROR")
-                return False
-
-        return self._backup_mgr.full_restore(
-            self._backup_dir,
-            progress_callback=lambda name, i, t: self._log(f"  Restoring {name} [{i + 1}/{t}]"),
-        )
+    def get_state(self) -> dict:
+        return {}

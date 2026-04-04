@@ -23,7 +23,11 @@ class OemUnlockPage(QWizardPage):
         layout = QVBoxLayout(self)
 
         # Header
-        header = QLabel("Before we begin, you need to enable 3 settings on your device:")
+        header = QLabel(
+            "These settings must be enabled BEFORE the rooting process.\n"
+            "OEM Unlock allows bootloader modification.\n"
+            "USB Debugging is needed for root verification after reboot."
+        )
         header.setStyleSheet("font-size: 14px; font-weight: bold; padding: 4px;")
         header.setWordWrap(True)
         layout.addWidget(header)
@@ -36,7 +40,7 @@ class OemUnlockPage(QWizardPage):
         step1_layout.addWidget(self._illust1)
         step1_desc = QLabel(
             "1. Open Settings\n"
-            "2. Scroll down to About Tablet\n"
+            "2. Go to Settings > About Tablet\n"
             "3. Find Build Number\n"
             "4. Tap it 7 times rapidly\n"
             '5. You\'ll see "You are now a developer!"'
@@ -72,8 +76,8 @@ class OemUnlockPage(QWizardPage):
             "1. In Developer Options\n"
             "2. Find USB Debugging toggle\n"
             "3. Turn it ON\n"
-            "4. Connect USB cable to PC\n"
-            '5. Tap "Allow" when prompted'
+            "4. This is needed for the VERIFICATION step after root\n"
+            "   (not for the BROM process itself)"
         )
         step3_desc.setStyleSheet("color: #c0c0d0; font-size: 12px; line-height: 1.5; padding: 8px;")
         step3_layout.addWidget(step3_desc, 1)

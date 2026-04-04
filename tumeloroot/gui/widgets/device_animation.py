@@ -149,11 +149,11 @@ class BromAnimation(QWidget):
     """Visual animation showing BROM connection with tablet, buttons, and USB cable."""
 
     STATES = {
-        "waiting": ("Scanning USB... Plug in your device", "#f0a030", True),
-        "detected": ("Device detected!", "#4ecca3", False),
-        "connecting": ("Establishing BROM connection...", "#e94560", True),
-        "connected": ("Connected successfully!", "#4ecca3", False),
-        "failed": ("Connection failed — retry BROM mode", "#e94560", False),
+        "waiting": ("Scanning for device... Enter BROM mode now", "#f0a030", True),
+        "detected": ("MediaTek device detected!", "#4ecca3", False),
+        "connecting": ("Connecting to BROM...", "#e94560", True),
+        "connected": ("BROM connection established!", "#4ecca3", False),
+        "failed": ("Connection failed - try BROM mode again", "#e94560", False),
     }
 
     def __init__(self, parent=None):
@@ -223,7 +223,7 @@ class BromAnimation(QWidget):
 
         # ---- POWER BUTTON on top of tablet ----
         btn_h = 8
-        pwr_active = self._brom_step in (1, 2)
+        pwr_active = self._brom_step == 0
         pwr_color = "#e94560" if pwr_active else "#3a3a5e"
         painter.setBrush(QBrush(QColor(pwr_color)))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -312,12 +312,12 @@ class BromAnimation(QWidget):
         info_y = 20
 
         step_texts = [
-            ("Power OFF", "Turn off the tablet completely", "#a0a0b0"),
-            ("Hold 3 buttons", "Power + Vol Up + Vol Down", "#e94560"),
-            ("Plug USB", "While holding all buttons", "#f0a030"),
-            ("Release Power", "Keep Vol Up + Vol Down held", "#4ecca3"),
-            ("Release all", "Wait 3-5 seconds, then release", "#4ecca3"),
-            ("Auto-detect", "Scanning for device...", "#f0a030"),
+            ("Power OFF", "Turn off the device completely", "#a0a0b0"),
+            ("Hold Vol+/Vol-", "Press and hold both volume buttons", "#e94560"),
+            ("Plug USB", "While holding buttons, plug USB cable", "#f0a030"),
+            ("Wait 3-5 sec", "Keep holding volume buttons", "#4ecca3"),
+            ("Release", "Release all buttons", "#4ecca3"),
+            ("Auto-detect", "App is scanning for device...", "#f0a030"),
         ]
 
         if self._state in ("connected", "detected"):

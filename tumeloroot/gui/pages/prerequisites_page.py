@@ -28,7 +28,7 @@ class PrerequisitesPage(QWizardPage):
         self._results = []
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Checking required dependencies..."))
+        layout.addWidget(QLabel("Checking required tools and drivers..."))
         layout.addSpacing(10)
 
         self._group = QGroupBox("Dependencies")
