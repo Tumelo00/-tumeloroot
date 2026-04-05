@@ -64,7 +64,9 @@ python -m tumeloroot
 
 ## Manual Root Guide for Linux Users
 
-If you prefer to root manually without the Tumeloroot GUI, or you are on a native Linux system, follow the steps below. This guide uses **mtkclient** for bootloader unlocking and partition operations via BROM exploit — no fastboot required for the critical steps.
+> **There is no GUI application for Linux.** The Tumeloroot GUI (`.exe`) is Windows-only. On Linux, the entire process is done through the **terminal using command-line tools**. No programming knowledge is required — just copy and paste the commands below in order.
+
+This guide uses **mtkclient** for bootloader unlocking and partition operations via BROM exploit — no fastboot required for the critical steps.
 
 ### Pre-Flight Checklist
 
