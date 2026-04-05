@@ -55,6 +55,9 @@ Download `Tumeloroot.exe` from the releases page and run it directly.
 ```bash
 git clone https://github.com/Tumelo00/-tumeloroot.git
 cd tumeloroot
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip setuptools
 pip install -e .
 python -m tumeloroot
 ```
@@ -141,19 +144,26 @@ If `adb` is not found after install, try logging out and back in, or run `hash -
 
 #### 1.3 — Install mtkclient
 
-mtkclient is the tool that communicates with MediaTek's Boot ROM over USB:
+mtkclient is the tool that communicates with MediaTek's Boot ROM over USB. It is recommended to install it inside a **Python virtual environment** to avoid conflicts with system packages:
 
 ```bash
-pip3 install mtkclient
+python3 -m venv ~/mtk-venv
+source ~/mtk-venv/bin/activate
+pip install --upgrade pip setuptools
+pip install mtkclient
 ```
 
-> **If you get "externally-managed-environment" error** (common on Ubuntu 23.04+), use a virtual environment:
+> **Important:** Every time you open a new terminal to use mtkclient, you need to activate the virtual environment first:
 > ```bash
-> python3 -m venv ~/mtk-venv
 > source ~/mtk-venv/bin/activate
-> pip install mtkclient
 > ```
-> You will need to run `source ~/mtk-venv/bin/activate` before using `python3 -m mtk` commands in future terminal sessions.
+
+> **If you get `ModuleNotFoundError: No module named 'Cryptodome'`** when running mtkclient, install `pycryptodome` explicitly:
+> ```bash
+> source ~/mtk-venv/bin/activate
+> pip install pycryptodome
+> ```
+> On some Linux distributions (like Gentoo), the system package installs as `Crypto` instead of `Cryptodome`. Installing `pycryptodome` via pip inside the venv fixes this.
 
 Verify mtkclient is installed:
 ```bash
@@ -699,6 +709,8 @@ Reboot the tablet. It will boot with the stock vendor_boot — no root.
 | `adb devices` shows `no permissions` | udev rules not applied — revisit Step 1.4, then reboot your computer |
 | mtkclient says "Waiting for device" | Tablet is not in BROM mode. Unplug, force off (hold power 15s), then hold Vol Up+Down and plug USB. Try USB 2.0 port |
 | `pip3 install mtkclient` fails with "externally-managed" | Use a virtual environment: `python3 -m venv ~/mtk-venv && source ~/mtk-venv/bin/activate && pip install mtkclient` |
+| `ModuleNotFoundError: No module named 'Cryptodome'` | Install pycryptodome in your venv: `source ~/mtk-venv/bin/activate && pip install pycryptodome`. On some distros (Gentoo, Arch), the system package uses the old `Crypto` name instead of `Cryptodome` |
+| `pip install -e .` fails with `Cannot import 'setuptools.backends._legacy'` | Update setuptools: `pip install --upgrade setuptools pip`. This error occurs with older setuptools versions |
 | Magisk "Install" button is grayed out | Make sure you downloaded the full Magisk APK (not the stub). Re-download from GitHub releases |
 | Patched image is 0 bytes | Magisk patch failed. Re-push vendor_boot.img and patch again. Make sure the original image is valid (64 MB) |
 | Device stuck in boot loop after flash | Flash the backup images via BROM (see "Restoring Stock" above) |
