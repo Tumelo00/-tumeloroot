@@ -64,7 +64,7 @@ python -m tumeloroot
 
 ## Manual Root Guide for Linux Users
 
-> **There is no GUI application for Linux.** The Tumeloroot GUI (`.exe`) is Windows-only. On Linux, the entire process is done through the **terminal using command-line tools**. No programming knowledge is required — just copy and paste the commands below in order.
+> **There is no GUI application for Linux.** The Tumeloroot GUI (`.exe`) is Windows-only. There is no one-click tool that handles everything automatically on Linux. On Linux, the entire process is done **manually through the terminal using command-line tools**. No programming knowledge is required — just copy and paste the commands below in order.
 
 This guide uses **mtkclient** for bootloader unlocking and partition operations via BROM exploit — no fastboot required for the critical steps.
 
