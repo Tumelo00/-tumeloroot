@@ -50,6 +50,6 @@ vbmeta:
 brom_instructions:
   steps:
     - "Power off the device completely"
-    - "Hold Vol Up + Vol Down buttons simultaneously"
-    - "While holding buttons, connect USB cable to PC"
+    - "Hold Power + Vol Up + Vol Down buttons simultaneously"
+    - "While holding all three buttons, connect USB cable to PC"
     - "Keep holding for 5-10 seconds until detected"

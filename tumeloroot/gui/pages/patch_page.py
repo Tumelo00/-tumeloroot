@@ -94,8 +94,8 @@ class PatchPage(QWizardPage):
         self._instr = QLabel(
             "Enter BROM mode:\n"
             "  1. Power OFF the device completely\n"
-            "  2. Hold Vol Up + Vol Down together\n"
-            "  3. While holding, plug USB cable into PC\n"
+            "  2. Hold Power + Vol Up + Vol Down together\n"
+            "  3. While holding all three buttons, plug USB cable into PC\n"
             "  4. Wait 3-5 seconds, then release\n\n"
             "The app scans for your device automatically."
         )

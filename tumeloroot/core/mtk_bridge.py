@@ -182,7 +182,7 @@ class MtkBridge:
         # Main connect with retry
         f.write('print("=" * 50)\n')
         f.write('print("Waiting for device in BROM mode...")\n')
-        f.write('print("Power OFF device > Hold Vol Up + Vol Down > Plug USB cable")\n')
+        f.write('print("Power OFF device > Hold Power + Vol Up + Vol Down > Plug USB cable")\n')
         f.write('print("Release buttons after 3-5 seconds")\n')
         f.write('print("=" * 50)\n')
         f.write('print("")\n\n')

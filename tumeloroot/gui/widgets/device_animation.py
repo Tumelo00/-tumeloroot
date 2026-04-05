@@ -313,9 +313,9 @@ class BromAnimation(QWidget):
 
         step_texts = [
             ("Power OFF", "Turn off the device completely", "#a0a0b0"),
-            ("Hold Vol+/Vol-", "Press and hold both volume buttons", "#e94560"),
-            ("Plug USB", "While holding buttons, plug USB cable", "#f0a030"),
-            ("Wait 3-5 sec", "Keep holding volume buttons", "#4ecca3"),
+            ("Hold Pwr+Vol+/-", "Press and hold Power + both volume buttons", "#e94560"),
+            ("Plug USB", "While holding all three buttons, plug USB cable", "#f0a030"),
+            ("Wait 3-5 sec", "Keep holding all buttons", "#4ecca3"),
             ("Release", "Release all buttons", "#4ecca3"),
             ("Auto-detect", "App is scanning for device...", "#f0a030"),
         ]
