@@ -35,7 +35,7 @@ Tumeloroot automates the entire process of unlocking the bootloader and rooting 
 
 Everything happens in a **single BROM connection**:
 
-1. **Device enters BROM mode** - Power off > Hold Vol Up + Vol Down > Plug USB
+1. **Device enters BROM mode** - Power off > Hold Power + Vol Up + Vol Down > Plug USB
 2. **Backup** - Reads 7 critical partitions (seccfg, boot_a/b, vendor_boot_a/b, vbmeta_a/b)
 3. **Unlock** - Modifies seccfg to unlock the bootloader
 4. **dm-verity** - Patches all 6 vbmeta partitions with flags=3
@@ -91,7 +91,7 @@ Before starting, go through this checklist:
 |------|---------|
 | **ADB** | Android Debug Bridge — communicates with the tablet while Android is running, over USB |
 | **mtkclient** | Open-source tool that exploits MediaTek's BROM (Boot ROM) to read/write partitions at the hardware level, bypassing Android entirely |
-| **BROM mode** | A low-level hardware mode on MediaTek chips. The tablet screen stays black, but the chip is listening over USB. Enter by holding Vol Up + Vol Down while plugging USB |
+| **BROM mode** | A low-level hardware mode on MediaTek chips. The tablet screen stays black, but the chip is listening over USB. Enter by holding Power + Vol Up + Vol Down while plugging USB |
 | **vendor_boot** | The partition that holds the kernel ramdisk on GKI (Generic Kernel Image) devices. On older devices this was in `boot`, but Android 13+ with GKI uses `vendor_boot` instead. Magisk patches this partition |
 | **A/B slots** | This device has two copies of every system partition (`_a` and `_b`). Android switches between them for seamless updates. We flash our patched image to **both** slots so root survives any slot switch |
 | **Magisk** | The root framework. It patches the vendor_boot image to inject `su` (superuser) access while keeping the system partition untouched |
@@ -342,8 +342,8 @@ Hold the power button → tap "Power off" → wait until the screen is completel
 
 #### 3.2 — Enter BROM mode
 
-1. **Hold Vol Up + Vol Down** buttons on the tablet (do NOT press power)
-2. **While holding both volume buttons**, plug the USB cable into the tablet
+1. **Hold Power + Vol Up + Vol Down** buttons on the tablet simultaneously
+2. **While holding all three buttons**, plug the USB cable into the tablet
 3. The tablet screen will stay black — this is normal
 4. Keep holding the buttons for 5-10 seconds
 
@@ -369,7 +369,7 @@ If you see `Done`, the bootloader is now unlocked. The device will factory reset
 **If mtkclient says "Waiting for device":**
 - Unplug the USB cable
 - Make sure the tablet is completely powered off (hold power for 15 seconds to force off)
-- Try again: hold Vol Up + Vol Down → plug USB
+- Try again: hold Power + Vol Up + Vol Down → plug USB
 - Try a different USB port (USB 2.0 ports sometimes work better than USB 3.0)
 - On some systems, you may need to run with `sudo`: `sudo python3 -m mtk e seccfg`
 - Check `dmesg | tail -20` to see if the USB device is detected at all
@@ -391,7 +391,7 @@ After the unlock command, the device may have exited BROM mode. Re-enter:
 
 1. Unplug USB cable
 2. Make sure the tablet is off (hold power 15 seconds to force off)
-3. Hold Vol Up + Vol Down → plug USB
+3. Hold Power + Vol Up + Vol Down → plug USB
 
 #### 4.2 — Extract vendor_boot from slot A
 
@@ -407,7 +407,7 @@ Done.
 
 #### 4.3 — Re-enter BROM mode and extract slot B
 
-Unplug USB → force off tablet → hold Vol Up + Vol Down → plug USB:
+Unplug USB → force off tablet → hold Power + Vol Up + Vol Down → plug USB:
 
 ```bash
 python3 -m mtk r vendor_boot_b ~/lenovo_root/vendor_boot_b.img
@@ -594,7 +594,7 @@ Hold power → Power off → wait until fully off.
 
 #### 8.2 — Enter BROM mode and flash slot A
 
-Hold Vol Up + Vol Down → plug USB:
+Hold Power + Vol Up + Vol Down → plug USB:
 
 ```bash
 python3 -m mtk w vendor_boot_a ~/lenovo_root/magisk_patched_vendor_boot.img
@@ -608,7 +608,7 @@ Done.
 
 #### 8.3 — Re-enter BROM mode and flash slot B
 
-Unplug USB → force off → hold Vol Up + Vol Down → plug USB:
+Unplug USB → force off → hold Power + Vol Up + Vol Down → plug USB:
 
 ```bash
 python3 -m mtk w vendor_boot_b ~/lenovo_root/magisk_patched_vendor_boot.img
@@ -709,7 +709,7 @@ Reboot the tablet. It will boot with the stock vendor_boot — no root.
 | `adb devices` shows nothing | Check USB cable (must be data-capable, not charge-only). Try a different USB port. Check USB Debugging is enabled |
 | `adb devices` shows `unauthorized` | Approve the dialog on the tablet screen. If no dialog appears, revoke USB debugging authorizations in Developer Options and reconnect |
 | `adb devices` shows `no permissions` | udev rules not applied — revisit Step 1.4, then reboot your computer |
-| mtkclient says "Waiting for device" | Tablet is not in BROM mode. Unplug, force off (hold power 15s), then hold Vol Up+Down and plug USB. Try USB 2.0 port |
+| mtkclient says "Waiting for device" | Tablet is not in BROM mode. Unplug, force off (hold power 15s), then hold Power + Vol Up + Vol Down and plug USB. Try USB 2.0 port |
 | `pip3 install mtkclient` fails with "externally-managed" | Use a virtual environment: `python3 -m venv ~/mtk-venv && source ~/mtk-venv/bin/activate && pip install mtkclient` |
 | `ModuleNotFoundError: No module named 'Cryptodome'` | Install pycryptodome in your venv: `source ~/mtk-venv/bin/activate && pip install pycryptodome`. On some distros (Gentoo, Arch), the system package uses the old `Crypto` name instead of `Cryptodome` |
 | `pip install -e .` fails with `Cannot import 'setuptools.backends._legacy'` | Update setuptools: `pip install --upgrade setuptools pip`. This error occurs with older setuptools versions |
@@ -808,11 +808,11 @@ adb devices                              # must show "device"
 adb shell getprop ro.boot.slot_suffix    # note: _a or _b
 
 # ---- Step 3: Unlock bootloader ----
-# >>> POWER OFF tablet, hold Vol Up+Down, plug USB <<<
+# >>> POWER OFF tablet, hold Power + Vol Up + Vol Down, plug USB <<<
 python3 -m mtk e seccfg
 
 # ---- Step 4: Extract vendor_boot ----
-# >>> Re-enter BROM: unplug, force off, Vol Up+Down, plug USB <<<
+# >>> Re-enter BROM: unplug, force off, Power + Vol Up + Vol Down, plug USB <<<
 python3 -m mtk r vendor_boot_a ~/lenovo_root/vendor_boot_a.img
 # >>> Re-enter BROM <<<
 python3 -m mtk r vendor_boot_b ~/lenovo_root/vendor_boot_b.img
@@ -833,7 +833,7 @@ adb shell ls /sdcard/Download/magisk_patched*
 adb pull /sdcard/Download/magisk_patched-XXXXX.img ~/lenovo_root/magisk_patched_vendor_boot.img
 
 # ---- Step 8: Flash patched image ----
-# >>> POWER OFF tablet, hold Vol Up+Down, plug USB <<<
+# >>> POWER OFF tablet, hold Power + Vol Up + Vol Down, plug USB <<<
 python3 -m mtk w vendor_boot_a ~/lenovo_root/magisk_patched_vendor_boot.img
 # >>> Re-enter BROM <<<
 python3 -m mtk w vendor_boot_b ~/lenovo_root/magisk_patched_vendor_boot.img
