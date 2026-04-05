@@ -75,7 +75,7 @@ Before starting, go through this checklist:
 - [ ] Tablet battery is **at least 50%** charged (a dead battery during flash = potential brick)
 - [ ] You have a **data-capable USB-C cable** (not a charge-only cable — see how to test below)
 - [ ] You have **at least 500 MB free disk space** on your Linux computer (for images + backups)
-- [ ] You have **backed up** all important data on the tablet (photos, contacts, app data — everything will be erased)
+- [ ] You have **backed up** all important data on the tablet (photos, contacts, app data — everything will be erased or may be erased)
 - [ ] You are **not** using a USB hub — connect directly to your computer's USB port
 - [ ] Your Linux user has **sudo** privileges
 
