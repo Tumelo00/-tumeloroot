@@ -15,6 +15,14 @@ Tumeloroot automates the entire process of unlocking the bootloader and rooting 
 - **Expandable** - Add new devices with simple YAML profile files
 - **Dark Themed GUI** - Modern PySide6 wizard interface with real-time progress
 
+## ⚠️ Supported Chipsets
+
+> **This tool and guide are designed and tested ONLY for MT8786 / MT6768 / MT6769 (Helio P65/G85) chipsets.**
+>
+> Newer MediaTek SoCs (e.g. Dimensity 6100+, Dimensity 7000 series, etc.) have **Secure Boot Chain (SBC)** and **Download Agent Authentication (DAA)** enabled at the hardware level. These chips **require a signed DA (Download Agent) file** to communicate via BROM — the standard mtkclient BROM exploit **will not work** on these devices without a valid DA.
+>
+> If you see `SBC enabled: True` and `DAA enabled: True` in mtkclient output, your device is **not compatible** with this tool or guide.
+
 ## Verified Devices
 
 | Device | Codename | Chipset | Android | Ramdisk In | Status |
@@ -65,6 +73,8 @@ python -m tumeloroot
 ## Manual Root Guide for Linux Users
 
 > **There is no GUI application for Linux.** The Tumeloroot GUI (`.exe`) is Windows-only. There is no one-click tool that handles everything automatically on Linux. On Linux, the entire process is done **manually through the terminal using command-line tools**. No programming knowledge is required — just copy and paste the commands below in order.
+
+> **⚠️ This guide is ONLY for the Lenovo Tab K11 (TB330XUP) with MT8786/MT6768/MT6769 chipset.** If your device has a different chipset (especially newer ones like Dimensity 6100+, 7000 series, etc.), do NOT follow this guide — the BROM exploit will fail because those chips have Secure Boot Chain (SBC) enabled. Check your chipset with `python3 -m mtk printids` before proceeding.
 
 This guide uses **mtkclient** for bootloader unlocking and partition operations via BROM exploit — no fastboot required for the critical steps.
 
